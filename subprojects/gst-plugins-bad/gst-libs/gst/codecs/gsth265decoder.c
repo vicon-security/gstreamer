@@ -1557,7 +1557,7 @@ gst_h265_decoder_prepare_rps (GstH265Decoder * self, const GstH265Slice * slice,
           &sps->short_term_ref_pic_set[slice_hdr->short_term_ref_pic_set_idx];
 
     if (stRefPic == NULL)
-      return FALSE;
+      return FALSE; 
 
     GST_LOG_OBJECT (self,
         "NumDeltaPocs: %d, NumNegativePics: %d, NumPositivePics %d",
