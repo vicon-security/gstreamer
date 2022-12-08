@@ -1,8 +1,10 @@
-project('gstreamer', 'c',
-  version : '1.20.4.1',
-  meson_version : '>= 0.59',
-  default_options : [ 'warning_level=1',
-                      'buildtype=debugoptimized' ])
+project(
+  'gstreamer',
+  'c',
+version : '1.20.4.2',
+meson_version : '>= 0.59',
+default_options : ['warning_level=1', 'buildtype=debugoptimized']
+)
 
 gst_version = meson.project_version()
 version_arr = gst_version.split('.')
