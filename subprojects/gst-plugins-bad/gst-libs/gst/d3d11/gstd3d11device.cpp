@@ -129,6 +129,8 @@ struct _GstD3D11DevicePrivate
 #endif
 };
 
+static GMutex driver_device_list_lock;
+
 static void
 debug_init_once (void)
 {
@@ -781,6 +783,8 @@ gst_d3d11_device_dispose (GObject * object)
 
   GST_LOG_OBJECT (self, "dispose");
 
+  g_mutex_lock (&driver_device_list_lock);
+
   GST_D3D11_CLEAR_COM (priv->video_device);
   GST_D3D11_CLEAR_COM (priv->video_context);
   GST_D3D11_CLEAR_COM (priv->device);
@@ -811,6 +815,8 @@ gst_d3d11_device_dispose (GObject * object)
 
   GST_D3D11_CLEAR_COM (priv->dxgi_info_queue);
 #endif
+
+  g_mutex_unlock (&driver_device_list_lock);
 
   G_OBJECT_CLASS (parent_class)->dispose (object);
 }
@@ -1192,13 +1198,18 @@ gst_d3d11_device_new_internal (const GstD3D11DeviceConstructData * data)
 GstD3D11Device *
 gst_d3d11_device_new (guint adapter_index, guint flags)
 {
+  GstD3D11Device* ret;
   GstD3D11DeviceConstructData data;
 
   data.data.adapter_index = adapter_index;
   data.type = DEVICE_CONSTRUCT_FOR_ADAPTER_INDEX;
   data.create_flags = flags;
 
-  return gst_d3d11_device_new_internal (&data);
+  g_mutex_lock (&driver_device_list_lock);
+  ret = gst_d3d11_device_new_internal (&data);
+  g_mutex_unlock (&driver_device_list_lock);
+
+  return ret;
 }
 
 /**
@@ -1214,13 +1225,18 @@ gst_d3d11_device_new (guint adapter_index, guint flags)
 GstD3D11Device *
 gst_d3d11_device_new_for_adapter_luid (gint64 adapter_luid, guint flags)
 {
+  GstD3D11Device* ret;
   GstD3D11DeviceConstructData data;
 
   data.data.adapter_luid = adapter_luid;
   data.type = DEVICE_CONSTRUCT_FOR_ADAPTER_LUID;
   data.create_flags = flags;
 
-  return gst_d3d11_device_new_internal (&data);
+  g_mutex_lock (&driver_device_list_lock);
+  ret = gst_d3d11_device_new_internal (&data);
+  g_mutex_unlock (&driver_device_list_lock);
+
+  return ret;
 }
 
 /**
@@ -1235,6 +1251,7 @@ gst_d3d11_device_new_for_adapter_luid (gint64 adapter_luid, guint flags)
 GstD3D11Device *
 gst_d3d11_device_new_wrapped (ID3D11Device * device)
 {
+  GstD3D11Device* ret;
   GstD3D11DeviceConstructData data;
 
   g_return_val_if_fail (device != nullptr, nullptr);
@@ -1243,7 +1260,11 @@ gst_d3d11_device_new_wrapped (ID3D11Device * device)
   data.type = DEVICE_CONSTRUCT_WRAPPED;
   data.create_flags = 0;
 
-  return gst_d3d11_device_new_internal (&data);
+  g_mutex_lock (&driver_device_list_lock);
+  ret = gst_d3d11_device_new_internal (&data);
+  g_mutex_unlock (&driver_device_list_lock);
+
+  return ret;
 }
 
 /**
