@@ -52,6 +52,7 @@ static GstStaticCaps src_template_caps =
 #define DEFAULT_BORDER_COLOR G_GUINT64_CONSTANT(0xffff000000000000)
 #define DEFAULT_GAMMA_MODE GST_VIDEO_GAMMA_MODE_NONE
 #define DEFAULT_PRIMARIES_MODE GST_VIDEO_PRIMARIES_MODE_NONE
+#define DEFAULT_BILINEAR_FILTERING TRUE
 
 struct _GstD3D11BaseConvert
 {
@@ -92,6 +93,7 @@ struct _GstD3D11BaseConvert
   GstVideoOrientationMethod active_method;
 
   SRWLOCK lock;
+  gboolean bilinear_filtering;
 };
 
 /**
@@ -308,6 +310,31 @@ gst_d3d11_base_convert_init (GstD3D11BaseConvert * self)
   self->border_color = DEFAULT_BORDER_COLOR;
   self->gamma_mode = self->active_gamma_mode = DEFAULT_GAMMA_MODE;
   self->primaries_mode = self->active_primaries_mode = DEFAULT_PRIMARIES_MODE;
+  self->bilinear_filtering = DEFAULT_BILINEAR_FILTERING;
+}
+
+static void
+gst_d3d11_base_convert_clear_shader_resource (GstD3D11BaseConvert * self)
+{
+  gint i;
+
+  for (i = 0; i < GST_VIDEO_MAX_PLANES; i++) {
+    GST_D3D11_CLEAR_COM (self->shader_resource_view[i]);
+    GST_D3D11_CLEAR_COM (self->render_target_view[i]);
+  }
+
+  self->num_input_view = 0;
+  self->num_output_view = 0;
+
+  for (i = 0; i < GST_VIDEO_MAX_PLANES; i++) {
+    GST_D3D11_CLEAR_COM (self->in_texture[i]);
+    GST_D3D11_CLEAR_COM (self->out_texture[i]);
+  }
+
+  g_clear_pointer (&self->converter, gst_d3d11_converter_free);
+  g_clear_pointer (&self->processor, gst_d3d11_video_processor_free);
+
+  self->processor_in_use = FALSE;
 }
 
 static void
@@ -1560,6 +1587,26 @@ gst_d3d11_base_convert_set_info (GstD3D11BaseFilter * filter,
       GST_TYPE_VIDEO_GAMMA_MODE, self->active_gamma_mode,
       GST_D3D11_CONVERTER_OPT_PRIMARIES_MODE,
       GST_TYPE_VIDEO_PRIMARIES_MODE, self->active_primaries_mode, nullptr);
+  self->in_d3d11_format =
+      gst_d3d11_device_format_from_gst (filter->device,
+      GST_VIDEO_INFO_FORMAT (in_info));
+  if (!self->in_d3d11_format) {
+    unknown_info = in_info;
+    goto format_unknown;
+  }
+
+  self->out_d3d11_format =
+      gst_d3d11_device_format_from_gst (filter->device,
+      GST_VIDEO_INFO_FORMAT (out_info));
+  if (!self->out_d3d11_format) {
+    unknown_info = out_info;
+    goto format_unknown;
+  }
+
+  self->converter =
+      gst_d3d11_converter_new (filter->device, in_info, out_info,
+          gst_structure_new ("GstD3D11Converter-Config", "bilinear-filtering",
+              G_TYPE_BOOLEAN, self->bilinear_filtering, nullptr));
 
   self->converter = gst_d3d11_converter_new (filter->device, in_info, out_info,
       config);
@@ -2074,6 +2121,7 @@ enum
   PROP_CONVERT_VIDEO_DIRECTION,
   PROP_CONVERT_GAMMA_MODE,
   PROP_CONVERT_PRIMARIES_MODE,
+  PROP_CONVERT_BILINEAR_FILTERING,
 };
 
 struct _GstD3D11Convert
@@ -2169,6 +2217,16 @@ gst_d3d11_convert_class_init (GstD3D11ConvertClass * klass)
       g_param_spec_enum ("primaries-mode", "Primaries Mode",
           "Primaries conversion mode", GST_TYPE_VIDEO_PRIMARIES_MODE,
           DEFAULT_PRIMARIES_MODE, (GParamFlags) (GST_PARAM_MUTABLE_PLAYING |
+   * GstD3D11Convert:bilinear-filtering:
+   *
+   * Use bilinear filtering on scaling
+   *
+   * Since: 1.21
+   */
+  g_object_class_install_property(gobject_class, PROP_CONVERT_BILINEAR_FILTERING,
+      g_param_spec_boolean ("bilinear-filtering", "Bilinear filtering",
+          "Use bilinear filtering on scaling",
+          DEFAULT_BILINEAR_FILTERING, (GParamFlags)(GST_PARAM_MUTABLE_PLAYING |
               G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
   gst_element_class_set_static_metadata (element_class,
@@ -2184,6 +2242,17 @@ gst_d3d11_convert_class_init (GstD3D11ConvertClass * klass)
 static void
 gst_d3d11_convert_init (GstD3D11Convert * self)
 {
+}
+
+static void
+gst_d3d11_base_convert_set_bilinear_filtering (GstD3D11BaseConvert* self,
+    gboolean bilinear_filtering)
+{
+    gboolean prev = self->bilinear_filtering;
+
+    self->bilinear_filtering = bilinear_filtering;
+    if (prev != self->bilinear_filtering)
+        gst_base_transform_reconfigure_src (GST_BASE_TRANSFORM_CAST(self));
 }
 
 static void
@@ -2211,6 +2280,8 @@ gst_d3d11_convert_set_property (GObject * object, guint prop_id,
     case PROP_CONVERT_PRIMARIES_MODE:
       gst_d3d11_base_convert_set_primaries_mode (base,
           (GstVideoPrimariesMode) g_value_get_enum (value));
+    case PROP_CONVERT_BILINEAR_FILTERING:
+      gst_d3d11_base_convert_set_bilinear_filtering (base, g_value_get_boolean(value));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -2239,6 +2310,8 @@ gst_d3d11_convert_get_property (GObject * object, guint prop_id,
       break;
     case PROP_CONVERT_PRIMARIES_MODE:
       g_value_set_enum (value, base->primaries_mode);
+    case PROP_CONVERT_BILINEAR_FILTERING:
+      g_value_set_boolean (value, base->bilinear_filtering);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -2475,6 +2548,7 @@ enum
   PROP_SCALE_0,
   PROP_SCALE_ADD_BORDERS,
   PROP_SCALE_BORDER_COLOR,
+  PROP_SCALE_BILINEAR_FILTERING,
 };
 
 struct _GstD3D11Scale
@@ -2514,6 +2588,18 @@ gst_d3d11_scale_class_init (GstD3D11ScaleClass * klass)
       g_param_spec_boolean ("add-borders", "Add Borders",
           "Add black borders if necessary to keep the display aspect ratio",
           DEFAULT_ADD_BORDERS, (GParamFlags) (GST_PARAM_MUTABLE_PLAYING |
+              G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+  /**
+   * GstD3D11Convert:bilinear-filtering:
+   *
+   * Use bilinear filtering on scaling
+   *
+   * Since: 1.21
+   */
+  g_object_class_install_property (gobject_class, PROP_SCALE_BILINEAR_FILTERING,
+      g_param_spec_boolean ("bilinear-filtering", "Bilinear filtering",
+          "Use bilinear filtering on scaling",
+          DEFAULT_BILINEAR_FILTERING, (GParamFlags)(GST_PARAM_MUTABLE_PLAYING |
               G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
   /**
@@ -2558,6 +2644,8 @@ gst_d3d11_scale_set_property (GObject * object, guint prop_id,
     case PROP_SCALE_BORDER_COLOR:
       gst_d3d11_base_convert_set_border_color (base,
           g_value_get_uint64 (value));
+    case PROP_SCALE_BILINEAR_FILTERING:
+      gst_d3d11_base_convert_set_bilinear_filtering (base, g_value_get_boolean(value));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -2577,6 +2665,8 @@ gst_d3d11_scale_get_property (GObject * object, guint prop_id,
       break;
     case PROP_SCALE_BORDER_COLOR:
       g_value_set_uint64 (value, base->border_color);
+    case PROP_SCALE_BILINEAR_FILTERING:
+      g_value_set_boolean (value, base->bilinear_filtering);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
