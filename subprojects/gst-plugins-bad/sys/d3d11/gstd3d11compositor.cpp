@@ -423,6 +423,13 @@ gst_d3d11_compositor_pad_class_init (GstD3D11CompositorPadClass * klass)
           GST_TYPE_STRUCTURE,
           (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS)));
 
+  g_object_class_install_property(gobject_class,
+      PROP_PAD_CROP,
+      g_param_spec_boxed("crop", "crop properties",
+          "provide left,right,top,bottom coordinates",
+          GST_TYPE_STRUCTURE,
+          (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS)));
+
   g_object_class_install_property (gobject_class, PROP_PAD_XPOS,
       g_param_spec_int ("xpos", "X Position", "X position of the picture",
           G_MININT, G_MAXINT, DEFAULT_PAD_XPOS, param_flags));
@@ -480,6 +487,7 @@ gst_d3d11_compositor_pad_class_init (GstD3D11CompositorPadClass * klass)
       g_param_spec_enum ("primaries-mode", "Primaries Mode",
           "Primaries conversion mode", GST_TYPE_VIDEO_PRIMARIES_MODE,
           DEFAULT_PAD_PRIMARIES_MODE, param_flags));
+
 
 
 
