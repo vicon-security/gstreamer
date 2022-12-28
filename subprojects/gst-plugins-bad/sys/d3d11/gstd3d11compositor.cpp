@@ -416,6 +416,13 @@ gst_d3d11_compositor_pad_class_init (GstD3D11CompositorPadClass * klass)
           GST_TYPE_STRUCTURE,
           (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS)));
 
+  g_object_class_install_property(gobject_class,
+      PROP_PAD_CROP,
+      g_param_spec_boxed("crop", "crop properties",
+          "provide left,right,top,bottom coordinates",
+          GST_TYPE_STRUCTURE,
+          (GParamFlags)(G_PARAM_READWRITE | GST_PARAM_CONTROLLABLE | G_PARAM_STATIC_STRINGS)));
+
   g_object_class_install_property (gobject_class, PROP_PAD_XPOS,
       g_param_spec_int ("xpos", "X Position", "X position of the picture",
           G_MININT, G_MAXINT, DEFAULT_PAD_XPOS, param_flags));
@@ -477,6 +484,7 @@ gst_d3d11_compositor_pad_class_init (GstD3D11CompositorPadClass * klass)
 
 
 
+
   vaggpadclass->prepare_frame =
       GST_DEBUG_FUNCPTR (gst_d3d11_compositor_pad_prepare_frame);
   vagg_pad_class->clean_frame =
@@ -501,8 +509,8 @@ gst_d3d11_compositor_pad_init (GstD3D11CompositorPad * pad)
   pad->desc = blend_templ[DEFAULT_PAD_OPERATOR];
   pad->gamma_mode = DEFAULT_PAD_GAMMA_MODE;
   pad->primaries_mode = DEFAULT_PAD_PRIMARIES_MODE;
-  //pad->crop_properties = gst_structure_from_string("props,left=200,right=200,top=300,bottom=300", NULL);
-  pad->crop_properties = NULL;//gst_structure_from_string("props,left=200,right=200,top=300,bottom=300", NULL);
+  
+  //pad->crop_properties = NULL;//gst_structure_from_string("props,left=200,right=200,top=300,bottom=300", NULL);
   pad->crop_left = -1;
   pad->crop_right = -1;
   pad->crop_top = -1;
