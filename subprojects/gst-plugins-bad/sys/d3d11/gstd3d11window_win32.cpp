@@ -797,10 +797,7 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     SetPropA (hWnd, D3D11_WINDOW_PROP_NAME, self);
   } else {
       self = (GstD3D11WindowWin32 *)GetPropA (hWnd, D3D11_WINDOW_PROP_NAME);
-      if (self->parent.device == nullptr)
-      {
-          return 0;
-      }
+  
       if (uMsg == WM_GST_D3D11_DESTROY_INTERNAL_WINDOW) {
           GST_INFO("Handle destroy window message");
           gst_d3d11_window_win32_release_external_handle(self->external_hwnd);
