@@ -207,13 +207,12 @@ gst_d3d11_window_win32_unprepare (GstD3D11Window * window)
 
   if (self->external_hwnd) {
     gst_d3d11_window_win32_release_external_handle (self->external_hwnd);
-    RemovePropA (self->internal_hwnd, D3D11_WINDOW_PROP_NAME);
-
     if (self->internal_hwnd_thread == g_thread_self ()) {
       /* State changing thread is identical to internal window thread.
        * window can be closed here */
 
       GST_INFO_OBJECT (self, "Closing internal window immediately");
+      RemovePropA(self->internal_hwnd, D3D11_WINDOW_PROP_NAME);
       gst_d3d11_window_win32_destroy_internal_window (self->internal_hwnd);
     } else {
       /* We cannot destroy internal window from non-window thread.
@@ -225,6 +224,13 @@ gst_d3d11_window_win32_unprepare (GstD3D11Window * window)
       GST_INFO_OBJECT (self, "Posting custom destory message");
       PostMessageA (self->internal_hwnd, WM_GST_D3D11_DESTROY_INTERNAL_WINDOW,
           0, 0);
+      g_mutex_lock (&self->lock);
+      if (self->internal_hwnd) {
+          GST_TRACE_OBJECT (self, "Waiting for the confirmation from the window thread");
+          g_cond_wait (&self->cond, &self->lock);
+          GST_TRACE_OBJECT (self, "Confirmation received");
+      }
+      g_mutex_unlock (&self->lock);
     }
 
     self->external_hwnd = NULL;
@@ -761,6 +767,16 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     ReleaseDC (hWnd, self->device_handle);
 
     SetPropA (hWnd, D3D11_WINDOW_PROP_NAME, self);
+  } else if (uMsg == WM_GST_D3D11_DESTROY_INTERNAL_WINDOW) {
+      GST_INFO ("Handle destroy window message");
+      self = GST_D3D11_WINDOW_WIN32 (GetPropA (hWnd, D3D11_WINDOW_PROP_NAME));
+      g_mutex_lock (&self->lock);
+      RemovePropA (self->internal_hwnd, D3D11_WINDOW_PROP_NAME);
+      gst_d3d11_window_win32_destroy_internal_window (hWnd);
+      self->internal_hwnd = NULL;
+      g_cond_signal (&self->cond);
+      g_mutex_unlock (&self->lock);
+      return 0;
   } else if (GetPropA (hWnd, D3D11_WINDOW_PROP_NAME)) {
     HANDLE handle = GetPropA (hWnd, D3D11_WINDOW_PROP_NAME);
 
@@ -793,11 +809,6 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
       default:
         break;
     }
-  } else if (uMsg == WM_GST_D3D11_DESTROY_INTERNAL_WINDOW) {
-    GST_INFO ("Handle destroy window message");
-    gst_d3d11_window_win32_destroy_internal_window (hWnd);
-
-    return 0;
   }
 
   if (self != NULL) {
@@ -820,6 +831,12 @@ sub_class_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
       (WNDPROC) GetPropA (hWnd, EXTERNAL_PROC_PROP_NAME);
   GstD3D11WindowWin32 *self =
       (GstD3D11WindowWin32 *) GetPropA (hWnd, D3D11_WINDOW_PROP_NAME);
+
+  if (!self) {
+      GST_INFO ("Window event, but 'self' is removed."
+          " hWnd = %u, uMsg = %u, wParam = %d, lParam = %d", hWnd, uMsg, wParam, lParam);
+      return CallWindowProcA (external_window_proc, hWnd, uMsg, wParam, lParam);
+  }
 
   if (uMsg == WM_GST_D3D11_CONSTRUCT_INTERNAL_WINDOW) {
     GstD3D11Window *window = GST_D3D11_WINDOW (self);
