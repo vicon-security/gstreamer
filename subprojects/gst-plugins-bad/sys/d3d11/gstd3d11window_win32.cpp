@@ -212,6 +212,12 @@ gst_d3d11_window_win32_unprepare (GstD3D11Window * window)
 {
   GstD3D11WindowWin32 *self = GST_D3D11_WINDOW_WIN32 (window);
 
+  // Cancel pending tasks
+  g_mutex_lock(&self->lock);
+  self->stopping = TRUE;
+  g_cond_signal(&self->cond);
+  g_mutex_unlock(&self->lock);
+
   self->stopping = TRUE;
   if (self->external_hwnd) {
     if (self->internal_hwnd_thread == g_thread_self ()) {
@@ -221,12 +227,14 @@ gst_d3d11_window_win32_unprepare (GstD3D11Window * window)
       GST_INFO_OBJECT (self, "Closing internal window immediately");
       gst_d3d11_window_win32_destroy_internal_window (self->internal_hwnd);
       RemovePropA(self->internal_hwnd, D3D11_WINDOW_PROP_NAME);
+
       // Internal window is released, so we release the reference that belongs to it.
       if (self->window_ref) {
           self->window_ref = NULL;
           g_assert(G_OBJECT(self)->ref_count > 1);
           gst_object_unref(self);
       }
+      gst_object_unref(self->window_ref);
       self->internal_hwnd = NULL;
       self->external_hwnd = NULL;
     } else {
@@ -438,8 +446,12 @@ gst_d3d11_window_win32_set_external_handle (GstD3D11WindowWin32 * self)
   
 
   /* Will create our internal window on parent window's thread */
-  SendMessageA (self->external_hwnd, WM_GST_D3D11_CONSTRUCT_INTERNAL_WINDOW,
+  g_mutex_lock(&self->lock);
+  PostMessageA(self->external_hwnd, WM_GST_D3D11_CONSTRUCT_INTERNAL_WINDOW,
       0, 0);
+  if (self->overlay_state != GST_D3D11_WINDOW_WIN32_OVERLAY_STATE_CLOSED && !self->stopping)
+      g_cond_wait(&self->cond, &self->lock);
+  g_mutex_unlock(&self->lock);
 }
 
 static void
@@ -850,6 +862,13 @@ sub_class_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     g_assert (self->window_ref == NULL);
     self->window_ref = gst_object_ref (self);
 
+    g_mutex_lock(&self->lock);
+    if (self->stopping) {
+        g_cond_signal(&self->cond);
+        g_mutex_unlock(&self->lock);
+        return 0;
+    }
+
     GST_DEBUG_OBJECT (self, "Create internal window");
 
     window->initialized = gst_d3d11_window_win32_create_internal_window (self);
@@ -865,7 +884,9 @@ sub_class_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         SWP_FRAMECHANGED | SWP_NOACTIVATE);
     MoveWindow (self->internal_hwnd, rect.left, rect.top, rect.right,
         rect.bottom, FALSE);
-    
+
+    g_cond_signal(&self->cond);
+    g_mutex_unlock(&self->lock);
     /* don't need to be chained up to parent window procedure,
      * as this is our custom message */
     return 0;
