@@ -35,6 +35,7 @@ GST_DEBUG_CATEGORY_EXTERN (gst_d3d11_window_debug);
 #define GST_CAT_DEFAULT gst_d3d11_window_debug
 
 G_LOCK_DEFINE_STATIC (create_lock);
+G_LOCK_DEFINE_STATIC (get_instance_lock);
 
 #define EXTERNAL_PROC_PROP_NAME "d3d11_window_external_proc"
 #define D3D11_WINDOW_PROP_NAME "gst_d3d11_window_win32_object"
@@ -132,6 +133,21 @@ gst_d3d11_window_win32_set_render_rectangle (GstD3D11Window * window,
 static void gst_d3d11_window_win32_set_title (GstD3D11Window * window,
     const gchar * title);
 
+/* return: transfer-full, may be NULL (and is a valid case) */
+static GstD3D11WindowWin32 *
+gst_d3d11_window_win32_hwnd_get_instance (HWND hwnd)
+{
+  HANDLE handle;
+
+  G_LOCK (get_instance_lock);
+  handle = GetPropA (hwnd, D3D11_WINDOW_PROP_NAME);
+  if (handle)
+    handle = gst_object_ref (handle);
+  G_UNLOCK (get_instance_lock);
+
+  return (GstD3D11WindowWin32 *) handle;
+}
+
 static void
 gst_d3d11_window_win32_class_init (GstD3D11WindowWin32Class * klass)
 {
@@ -207,7 +223,9 @@ gst_d3d11_window_win32_unprepare (GstD3D11Window * window)
 
   if (self->external_hwnd) {
     gst_d3d11_window_win32_release_external_handle (self->external_hwnd);
+    G_LOCK (get_instance_lock);
     RemovePropA (self->internal_hwnd, D3D11_WINDOW_PROP_NAME);
+    G_UNLOCK (get_instance_lock);
 
     if (self->internal_hwnd_thread == g_thread_self ()) {
       /* State changing thread is identical to internal window thread.
@@ -761,16 +779,7 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     ReleaseDC (hWnd, self->device_handle);
 
     SetPropA (hWnd, D3D11_WINDOW_PROP_NAME, self);
-  } else if (GetPropA (hWnd, D3D11_WINDOW_PROP_NAME)) {
-    HANDLE handle = GetPropA (hWnd, D3D11_WINDOW_PROP_NAME);
-
-    if (!GST_IS_D3D11_WINDOW_WIN32 (handle)) {
-      GST_WARNING ("%p is not d3d11window object", handle);
-      return DefWindowProcA (hWnd, uMsg, wParam, lParam);
-    }
-
-    self = GST_D3D11_WINDOW_WIN32 (handle);
-
+  } else if (NULL != (self = gst_d3d11_window_win32_hwnd_get_instance (hWnd))) {
     g_assert (self->internal_hwnd == hWnd);
 
     gst_d3d11_device_lock (self->parent.device);
@@ -781,18 +790,23 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg) {
       case WM_SIZE:
         /* We handled this event already */
+        gst_object_unref (self);
         return 0;
       case WM_NCHITTEST:
         /* To passthrough mouse event if external window is used.
          * Only hit-test succeeded window can receive/handle some mouse events
          * and we want such events to be handled by parent (application) window
          */
-        if (self->external_hwnd)
-          return (LRESULT) HTTRANSPARENT;
+        if (self->external_hwnd) {
+          gst_object_unref (self);
+          return (LRESULT)HTTRANSPARENT;
+        }
         break;
       default:
         break;
     }
+    gst_object_unref (self);
+    self = NULL;
   } else if (uMsg == WM_GST_D3D11_DESTROY_INTERNAL_WINDOW) {
     GST_INFO ("Handle destroy window message");
     gst_d3d11_window_win32_destroy_internal_window (hWnd);
@@ -818,8 +832,7 @@ sub_class_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
   WNDPROC external_window_proc =
       (WNDPROC) GetPropA (hWnd, EXTERNAL_PROC_PROP_NAME);
-  GstD3D11WindowWin32 *self =
-      (GstD3D11WindowWin32 *) GetPropA (hWnd, D3D11_WINDOW_PROP_NAME);
+  GstD3D11WindowWin32 *self = gst_d3d11_window_win32_hwnd_get_instance (hWnd);
 
   if (uMsg == WM_GST_D3D11_CONSTRUCT_INTERNAL_WINDOW) {
     GstD3D11Window *window = GST_D3D11_WINDOW (self);
@@ -843,6 +856,7 @@ sub_class_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     /* don't need to be chained up to parent window procedure,
      * as this is our custom message */
+    gst_object_unref (self);
     return 0;
   } else if (self) {
     if (uMsg == WM_SIZE) {
@@ -871,6 +885,9 @@ sub_class_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
           lParam);
       gst_d3d11_device_unlock (self->parent.device);
     }
+
+    gst_object_unref(self);
+    self = NULL;
   }
 
   {
