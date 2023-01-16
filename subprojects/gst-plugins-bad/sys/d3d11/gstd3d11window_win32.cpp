@@ -814,15 +814,7 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return 0;
   }
 
-  if (self != NULL) {
-    LRESULT ret;
-
-    gst_d3d11_device_lock(self->parent.device);
-    ret = DefWindowProcA (hWnd, uMsg, wParam, lParam);
-    gst_d3d11_device_unlock(self->parent.device);
-    return ret;
-  } else
-    return DefWindowProcA (hWnd, uMsg, wParam, lParam);
+  return DefWindowProcA (hWnd, uMsg, wParam, lParam);
 }
 
 static LRESULT FAR PASCAL
@@ -890,14 +882,7 @@ sub_class_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     self = NULL;
   }
 
-  {
-      LRESULT ret;
-
-      gst_d3d11_device_lock(self->parent.device);
-      ret = CallWindowProcA(external_window_proc, hWnd, uMsg, wParam, lParam);
-      gst_d3d11_device_unlock(self->parent.device);
-      return ret;
-  }
+  return CallWindowProcA (external_window_proc, hWnd, uMsg, wParam, lParam);
 }
 
 static void
