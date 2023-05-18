@@ -353,7 +353,7 @@ gst_d3d11_d2d1_decide_allocation(GstBaseTransform* trans, GstQuery* query)
 
     size = GST_VIDEO_INFO_SIZE(&vinfo);
     GST_DEBUG_OBJECT(filter, "Setting min size to 2");
-    min = 2;
+    min = 30;
     max = 0;
 
     GST_DEBUG_OBJECT(filter, "Creating a new buffer pool");
