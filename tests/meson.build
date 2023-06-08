@@ -1,5 +1,13 @@
-if get_option('tests').disabled()
-	subdir_done()
+if not get_option('benchmarks').disabled()
+  subdir('benchmarks')
 endif
-subdir('static-plugins')
-subdir('python')
+if not get_option('tests').disabled() and gst_check_dep.found()
+  subdir('validate')
+  subdir('check')
+endif
+if not get_option('examples').disabled()
+  subdir('examples')
+endif
+if not get_option('tools').disabled()
+  subdir('misc')
+endif

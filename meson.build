@@ -1,522 +1,683 @@
-project('gstreamer-full', 'c',
+project('gstreamer', 'c',
   version : '1.22.3',
-  meson_version : '>= 0.62.0',
-  default_options : ['buildtype=debugoptimized',
-                     # Needed due to https://github.com/mesonbuild/meson/issues/1889,
-                     # but this can cause problems in the future. Remove it
-                     # when it's no longer necessary.
-                     'cpp_std=c++14'])
+  meson_version : '>= 0.62',
+  default_options : [ 'warning_level=1',
+                      'buildtype=debugoptimized' ])
+
+gst_version = meson.project_version()
+version_arr = gst_version.split('.')
+gst_version_major = version_arr[0].to_int()
+gst_version_minor = version_arr[1].to_int()
+gst_version_micro = version_arr[2].to_int()
+if version_arr.length() == 4
+  gst_version_nano = version_arr[3].to_int()
+else
+  gst_version_nano = 0
+endif
+gst_version_is_dev = gst_version_minor % 2 == 1 and gst_version_micro < 90
 
 apiversion = '1.0'
-gst_version = '>= @0@'.format(meson.project_version())
+soversion = 0
+# maintaining compatibility with the previous libtool versioning
+# current = minor * 100 + micro
+curversion = gst_version_minor * 100 + gst_version_micro
+libversion = '@0@.@1@.0'.format(soversion, curversion)
+osxversion = curversion + 1
 
-build_system = build_machine.system()
+prefix = get_option('prefix')
+
+datadir = join_paths(prefix, get_option('datadir'))
+libexecdir = get_option('libexecdir')
+helpers_install_dir = join_paths(libexecdir, 'gstreamer-1.0')
+
 cc = meson.get_compiler('c')
+host_system = host_machine.system()
 
-fs = import('fs')
-gnome = import('gnome')
-pkgconfig = import('pkgconfig')
-python3 = import('python').find_installation()
-# Ensure that we're not being run from inside the development environment
-# because that will confuse meson, and it might find the already-built
-# gstreamer. It's fine if people run `ninja` as long as it doesn't run
-# reconfigure because ninja doesn't care about the env.
-ensure_not_devenv = '''
-import os
-assert('GST_ENV' not in os.environ)
-'''
-cmdres = run_command(python3, '-c', ensure_not_devenv, check: false)
-if cmdres.returncode() != 0
-  error('Do not run `ninja reconfigure` or `meson` for gst-build inside the development environment, you will run into problems')
-endif
-
-# Install gst-indent pre-commit hook
-run_command(python3, '-c', 'import shutil; shutil.copy("scripts/git-hooks/multi-pre-commit.hook", ".git/hooks/pre-commit")', check: false)
-
-# On macOS, you have to run "Install Certificates.command" otherwise Python
-# doesn't have access to the latest SSL CA Certificates, and Meson will fail to
-# download wrap files from websites that use, for example, Let's Encrypt.
-# We already recommend this in the README, but add a warning here as well.
-# Can't make this an error because the user might be using XCode's Python
-# 3 which doesn't have this script.
-if build_system == 'darwin'
-  python3_cacert_file = python3.get_path('data') / 'etc/openssl/cert.pem'
-  install_cert_cmd = '/Applications/Python @0@/Install Certificates.command'.format(python3.language_version())
-  if not fs.is_symlink(python3_cacert_file) and fs.is_file(install_cert_cmd)
-    warning('Please run "@0@" so that Python has access to the latest SSL certificates. Meson might fail to download some wraps without it.'.format(install_cert_cmd))
+if host_system == 'darwin'
+  ios_test_code = '''#include <TargetConditionals.h>
+  #if ! TARGET_OS_IPHONE
+  #error "Not iOS/tvOS/watchOS/iPhoneSimulator"
+  #endif'''
+  if cc.compiles(ios_test_code, name : 'building for iOS')
+    host_system = 'ios'
   endif
+
+  add_languages('objc', native: false, required: true)
 endif
 
-documented_projects = ''
-# Make it possible to use msys2 built zlib which fails
-# when not using the mingw toolchain as it uses unistd.h
-if not meson.is_subproject() and cc.get_id() == 'msvc'
-  uname = find_program('uname', required: false)
-  if uname.found()
-    ret = run_command(uname, '-o', check: false)
-    if ret.returncode() == 0 and ret.stdout().to_lower() == 'msys'
-      ret = run_command(uname, '-r', check: false)
-      # The kernel version returned by uname is actually the msys version
-      if ret.returncode() == 0 and ret.stdout().startswith('2')
-        # If a system zlib is found, disable UNIX features in zlib.h and zconf.h
-        if cc.find_library('z').found()
-          add_global_arguments('-DZ_SOLO', language: 'c')
-        endif
-      endif
-    endif
-  endif
-endif
+cdata = configuration_data()
 
-# Ensure that MSVC interprets all source code as UTF-8. Only do this when we're
-# not a subproject, because subprojects are not allowed to call
-# add_global_arguments().
-if not meson.is_subproject() and cc.get_id() == 'msvc'
-  add_global_arguments(
+if cc.get_id() == 'msvc'
+  msvc_args = [
+      # Ignore several spurious warnings for things gstreamer does very commonly
+      # If a warning is completely useless and spammy, use '/wdXXXX' to suppress it
+      # If a warning is harmless but hard to fix, use '/woXXXX' so it's shown once
+      # NOTE: Only add warnings here if you are sure they're spurious
+      '/wd4018', # implicit signed/unsigned conversion
+      '/wd4146', # unary minus on unsigned (beware INT_MIN)
+      '/wd4244', # lossy type conversion (e.g. double -> int)
+      '/wd4305', # truncating type conversion (e.g. double -> float)
       cc.get_supported_arguments(['/utf-8']), # set the input encoding to utf-8
-      language: ['c', 'cpp'])
+  ]
+
+  if gst_version_is_dev
+    # Enable some warnings on MSVC to match GCC/Clang behaviour
+    msvc_args += cc.get_supported_arguments([
+      '/we4002', # too many actual parameters for macro 'identifier'
+      '/we4003', # not enough actual parameters for macro 'identifier'
+      '/we4013', # 'function' undefined; assuming extern returning int
+      '/we4020', # 'function' : too many actual parameters
+      '/we4027', # function declared without formal parameter list
+      '/we4029', # declared formal parameter list different from definition
+      '/we4033', # 'function' must return a value
+      '/we4045', # 'array' : array bounds overflow
+      '/we4047', # 'operator' : 'identifier1' differs in levels of indirection from 'identifier2'
+      '/we4053', # one void operand for '?:'
+      '/we4062', # enumerator 'identifier' in switch of enum 'enumeration' is not handled
+      '/we4098', # 'function' : void function returning a value
+      '/we4101', # 'identifier' : unreferenced local variable
+      '/we4189', # 'identifier' : local variable is initialized but not referenced
+    ])
+  endif
+  add_project_arguments(msvc_args, language: 'c')
+elif cc.has_link_argument('-Wl,-Bsymbolic-functions')
+  # FIXME: Add an option for this if people ask for it
+  add_project_link_arguments('-Wl,-Bsymbolic-functions', language : 'c')
 endif
 
-building_full = get_option('default_library') == 'static'
-tools_option = []
-if building_full and not get_option('tools').disabled()
-  # Do not build subprojects tools when we build them against gst-full
-  tools_option = ['tools=disabled']
+# glib doesn't support unloading, which means that unloading and reloading
+# any library that registers static types will fail
+if cc.has_link_argument('-Wl,-z,nodelete')
+  add_project_link_arguments('-Wl,-z,nodelete', language: 'c')
 endif
 
-# Ordered list of subprojects (dict has no ordering guarantees)
-subprojects = [
-  ['gstreamer', {'build-hotdoc': true, 'subproject_options': tools_option}],
-  ['gst-plugins-base', {'option': get_option('base'), 'build-hotdoc': true}],
-  ['gst-plugins-good', {'option': get_option('good'), 'build-hotdoc': true}],
-  ['libnice', { 'option': get_option('libnice'), 'match_gst_version': false}],
-  ['gst-plugins-bad', { 'option': get_option('bad'), 'build-hotdoc': true}],
-  ['gst-plugins-ugly', { 'option': get_option('ugly'), 'build-hotdoc': true}],
-  ['gst-libav', { 'option': get_option('libav'), 'build-hotdoc': true}],
-  ['gst-rtsp-server', { 'option': get_option('rtsp_server'), 'build-hotdoc': true}],
-  ['gst-devtools', { 'option': get_option('devtools'), 'build-hotdoc': true, 'subproject_options': tools_option}],
-  ['gst-integration-testsuites', { 'option': get_option('devtools') }],
-  ['gst-editing-services', { 'option': get_option('ges'), 'build-hotdoc': true, 'subproject_options': tools_option}],
-  ['gstreamer-vaapi', { 'option': get_option('vaapi'), 'build-hotdoc': true}],
-  ['gst-omx', { 'option': get_option('omx'), 'build-hotdoc': true}],
-  ['gstreamer-sharp', { 'option': get_option('sharp') }],
-  ['pygobject', { 'option': get_option('python'), 'match_gst_version': false, 'sysdep': 'pygobject-3.0', 'sysdep_version': '>= 3.8' }],
-  ['gst-python', { 'option': get_option('python')}],
-  ['gst-examples', { 'option': get_option('gst-examples'), 'match_gst_versions': false}],
-  ['gst-plugins-rs', { 'option': get_option('rs'), 'build-hotdoc': true, 'match_gst_version': false}],
+# Symbol visibility
+have_visibility_hidden = false
+if cc.has_argument('-fvisibility=hidden')
+  add_project_arguments('-fvisibility=hidden', language: 'c')
+  have_visibility_hidden = true
+endif
+
+# Disable strict aliasing
+if cc.has_argument('-fno-strict-aliasing')
+  add_project_arguments('-fno-strict-aliasing', language: 'c')
+endif
+
+# Define G_DISABLE_DEPRECATED for development versions
+if gst_version_is_dev
+  message('Disabling deprecated GLib API')
+  add_project_arguments('-DG_DISABLE_DEPRECATED', language: 'c')
+endif
+
+cast_checks = get_option('gobject-cast-checks')
+if cast_checks.disabled() or (cast_checks.auto() and not gst_version_is_dev)
+  message('Disabling GLib cast checks')
+  add_project_arguments('-DG_DISABLE_CAST_CHECKS', language: 'c')
+endif
+
+glib_asserts = get_option('glib-asserts')
+if glib_asserts.disabled() or (glib_asserts.auto() and not gst_version_is_dev)
+  message('Disabling GLib asserts')
+  add_project_arguments('-DG_DISABLE_ASSERT', language: 'c')
+endif
+
+glib_checks = get_option('glib-checks')
+if glib_checks.disabled() or (glib_checks.auto() and not gst_version_is_dev)
+  message('Disabling GLib checks')
+  add_project_arguments('-DG_DISABLE_CHECKS', language: 'c')
+endif
+
+cdata.set_quoted('GST_API_VERSION', apiversion)
+cdata.set_quoted('GST_DATADIR', datadir)
+cdata.set_quoted('LOCALEDIR', join_paths(prefix, get_option('localedir')))
+cdata.set_quoted('LIBDIR', join_paths(prefix, get_option('libdir')))
+cdata.set_quoted('GST_API_VERSION', '1.0')
+cdata.set_quoted('GETTEXT_PACKAGE', 'gstreamer-1.0')
+cdata.set_quoted('GST_LICENSE', 'LGPL')
+cdata.set_quoted('PACKAGE', 'gstreamer')
+cdata.set_quoted('PACKAGE_NAME', 'GStreamer')
+cdata.set_quoted('PACKAGE_STRING', 'GStreamer @0@'.format(gst_version))
+cdata.set_quoted('PACKAGE_TARNAME', 'gstreamer')
+cdata.set_quoted('PACKAGE_BUGREPORT', 'https://gitlab.freedesktop.org/gstreamer/gstreamer/issues/new')
+cdata.set_quoted('PACKAGE_URL', '')
+cdata.set_quoted('PACKAGE_VERSION', gst_version)
+cdata.set_quoted('PLUGINDIR', join_paths(get_option('prefix'), get_option('libdir'), 'gstreamer-1.0'))
+cdata.set_quoted('VERSION', gst_version)
+cdata.set_quoted('GST_PLUGIN_SCANNER_INSTALLED', join_paths(prefix, helpers_install_dir, 'gst-plugin-scanner'))
+cdata.set_quoted('GST_PTP_HELPER_INSTALLED', join_paths(prefix, helpers_install_dir, 'gst-ptp-helper'))
+cdata.set_quoted('GST_PLUGIN_SUBDIR', get_option('libdir'),
+  description: 'plugin directory path component, used to find plugins on relocatable builds')
+cdata.set_quoted('GST_PLUGIN_SCANNER_SUBDIR', libexecdir,
+  description: 'libexecdir path component, used to find plugin-scanner on relocatable builds')
+cdata.set('GST_DISABLE_OPTION_PARSING', not get_option('option-parsing'))
+
+mem_align_opt = get_option('memory-alignment')
+if mem_align_opt == 'malloc'
+  cdata.set('MEMORY_ALIGNMENT_MALLOC', 1)
+elif mem_align_opt == 'pagesize'
+  cdata.set('MEMORY_ALIGNMENT_PAGESIZE', 1)
+else
+  cdata.set('MEMORY_ALIGNMENT', mem_align_opt.to_int())
+endif
+
+if ['darwin', 'ios'].contains(host_system)
+  cdata.set_quoted('GST_EXTRA_MODULE_SUFFIX', '.dylib')
+endif
+
+if gst_version_nano > 0
+    # Have GST_ERROR message printed when running from git
+    cdata.set('GST_LEVEL_DEFAULT', 'GST_LEVEL_ERROR')
+else
+    cdata.set('GST_LEVEL_DEFAULT', 'GST_LEVEL_NONE')
+endif
+
+# GStreamer package name and origin url
+gst_package_name = get_option('package-name')
+if gst_package_name == ''
+  if gst_version_nano == 0
+    gst_package_name = 'GStreamer source release'
+  elif gst_version_nano == 1
+    gst_package_name = 'GStreamer git'
+  else
+    gst_package_name = 'GStreamer prerelease'
+  endif
+endif
+cdata.set_quoted('GST_PACKAGE_NAME', gst_package_name)
+cdata.set_quoted('GST_PACKAGE_ORIGIN', get_option('package-origin'))
+
+# These are only needed/used by the ABI tests
+host_defines = [
+  [ 'x86', 'HAVE_CPU_I386' ],
+  [ 'x86_64', 'HAVE_CPU_X86_64' ],
+  [ 'arm', 'HAVE_CPU_ARM' ],
+  [ 'aarch64', 'HAVE_CPU_AARCH64' ],
+  [ 'mips', 'HAVE_CPU_MIPS' ],
+  [ 'powerpc', 'HAVE_CPU_PPC' ],
+  [ 'powerpc64', 'HAVE_CPU_PPC64' ],
+  [ 'alpha', 'HAVE_CPU_ALPHA' ],
+  [ 'sparc', 'HAVE_CPU_SPARC' ],
+  [ 'ia64', 'HAVE_CPU_IA64' ],
+  [ 'hppa', 'HAVE_CPU_HPPA' ],
+  [ 'm68k', 'HAVE_CPU_M68K' ],
+  [ 's390', 'HAVE_CPU_S390' ],
+]
+foreach h : host_defines
+  if h.get(0) == host_machine.cpu_family()
+    cdata.set(h.get(1), 1)
+  endif
+endforeach
+# FIXME: should really be called HOST_CPU or such
+cdata.set_quoted('TARGET_CPU', host_machine.cpu())
+
+check_headers = [
+  'dlfcn.h',
+  'inttypes.h',
+  'memory.h',
+  'poll.h',
+  'stdint.h',
+  'stdio_ext.h',
+  'strings.h',
+  'string.h',
+  'sys/param.h',
+  'sys/poll.h',
+  'sys/prctl.h',
+  'sys/socket.h',
+  'sys/stat.h',
+  'sys/times.h',
+  'sys/time.h',
+  'sys/types.h',
+  'sys/utsname.h',
+  'sys/wait.h',
+  'ucontext.h',
+  'unistd.h',
+  'sys/resource.h',
+  'sys/uio.h',
 ]
 
-if build_system == 'windows'
-  subproject('win-flex-bison-binaries')
-  subproject('win-nasm')
-elif build_system == 'darwin'
-  subproject('macos-bison-binary')
+if host_system == 'windows'
+  check_headers += ['winsock2.h']
 endif
 
-orc_option = get_option('orc')
-# There is a check below to keep this in sync with subprojects/gst-plugins-base/meson.build
-orc_req = '>= 0.4.24'
-orc_source_option = get_option('orc-source')
-orc_subproject = disabler()
-if orc_option.allowed()
-  if orc_source_option == 'subproject'
-    orc_subproject = subproject('orc', required: orc_option)
-  else
-    dependency('orc-0.4', version: orc_req, required: orc_option,
-               allow_fallback: orc_source_option == 'auto')
-  endif
-endif
-
-foreach custom_subproj: get_option('custom_subprojects').split(',')
-    if custom_subproj != ''
-        message ('Adding custom subproject ' + custom_subproj)
-        subprojects += [[custom_subproj, {'match_gst_version': false}]]
-    endif
-endforeach
-
-
-subprojects_names = []
-plugins_doc_caches = []
-orc_update_targets = []
-all_plugins = []
-all_tools = {}
-# Using a list and not a dict to keep the ordering to build the chain of `gir`
-# dependencies
-all_libraries = []
-foreach sp : subprojects
-  project_name = sp[0]
-  build_infos = sp[1]
-  is_required = build_infos.get('option', true)
-  sysdep = build_infos.get('sysdep', '')
-  sysdep_version = build_infos.get('sysdep_version', '')
-  match_gst_version = build_infos.get('match_gst_version', true)
-  default_options =  build_infos.get('subproject_options', [])
-
-  if match_gst_version
-    subproj = subproject(project_name, version: gst_version, required: is_required, default_options: default_options)
-  elif sysdep != ''
-    sysdep_dep = dependency(sysdep, version: sysdep_version, required: is_required, default_options: default_options)
-  else
-    subproj = subproject(project_name, required: is_required, default_options: default_options)
-  endif
-
-  if project_name == 'gst-plugins-base'
-    gst_base_orc_req = subproj.get_variable('orc_req', '')
-    if gst_base_orc_req != orc_req
-      error('orc_req is "@0@" but it should be "@1@" from subprojects/gst-plugins-base/meson.build'
-            .format(orc_req, gst_base_orc_req))
-    endif
-  endif
-
-  if subproj.found()
-    plugins = subproj.get_variable('gst_plugins', [])
-    legacy_plugins = subproj.get_variable('plugins', [])
-    all_plugins += plugins
-    if plugins.length() == 0 and legacy_plugins.length() > 0
-      warning(f'DEPRECATED use of the `plugins` variable in @project_name@.')
-      warning('The variable should now be called `gst_plugins` and use:')
-      warning('`declare_dependency( link_with: <plugin_target>, variable: {\'full_path\': <plugin_target>.full_path()})` instead')
-      foreach plugin: legacy_plugins
-        all_plugins += [declare_dependency(link_with: plugin, variables: {'full_path': plugin.full_path()})]
-      endforeach
-    endif
-
-    all_libraries += subproj.get_variable('gst_libraries', [])
-    if not get_option('tools').disabled()
-      all_tools += subproj.get_variable('gst_tools', {})
-    endif
-
-    orc_update_targets += subproj.get_variable('orc_update_targets', [])
-
-    subprojects_names += [project_name]
-
-    if not meson.is_cross_build() and build_infos.get('build-hotdoc', false)
-      plugins_doc_caches += [subproj.get_variable('gst_plugins_doc_dep', [])]
-      if documented_projects != ''
-        documented_projects += ','
-      endif
-      documented_projects  += project_name
-    endif
+foreach h : check_headers
+  if cc.has_header(h)
+    define = 'HAVE_' + h.underscorify().to_upper()
+    cdata.set(define, 1)
   endif
 endforeach
 
-# Check if we need to also build glib-networking for TLS modules
-giomodules = []
-glib_dep = dependency('glib-2.0')
-if glib_dep.type_name() == 'internal'
-  subp = subproject('glib-networking', required : get_option('tls'),
-             default_options: ['gnutls=auto', 'openssl=auto'])
-  if subp.found()
-    giomodules += subp.get_variable('giomodules', [])
-  endif
+if cc.has_member('struct tm', 'tm_gmtoff', prefix : '#include <time.h>')
+  cdata.set('HAVE_TM_GMTOFF', 1)
 endif
 
-gst_plugins_doc_dep = custom_target('plugins-doc-cache',
-  command: [python3, '-c', 'print("Built all doc caches")'],
-  input: plugins_doc_caches,
-  output: 'plugins_doc_caches',
-  capture: true,
-)
+check_functions = [
+  'gmtime_r',
+  'sigaction',
+  'getrusage',
+  'fseeko',
+  'ftello',
+  'poll',
+  'ppoll',
+  'pselect',
+  'getpagesize',
+  'clock_gettime',
+  'clock_nanosleep',
+  'strnlen',
+  # These are needed by libcheck
+  'getline',
+  'mkstemp',
+  'alarm',
+  'gettimeofday',
+]
 
-if meson.is_cross_build() or build_machine.system() == 'windows'
-    if get_option('doc').enabled()
-        error('Documentation enabled but building the doc while cross building or building on windows is not supported yet.')
-    endif
-
-    documented_projects = ''
-    message('Documentation not built as building the documentation while cross building or building on windows is not supported yet.')
-else
-  hotdoc_p = find_program('hotdoc', required : get_option('doc'))
-  if not hotdoc_p.found()
-    documented_projects = ''
-    message('Not building documentation as hotdoc was not found')
+foreach f : check_functions
+  if cc.has_function(f)
+    define = 'HAVE_' + f.underscorify().to_upper()
+    cdata.set(define, 1)
   endif
+endforeach
+
+if cc.has_function('localtime_r', prefix : '#include<time.h>')
+  cdata.set('HAVE_LOCALTIME_R', 1)
+  # Needed by libcheck
+  cdata.set('HAVE_DECL_LOCALTIME_R', 1)
 endif
 
-write_file_contents = '''
-import os
-import sys
+if cc.links('''#define _GNU_SOURCE
+               #include <pthread.h>
+               int main() {
+                 pthread_setname_np("example"); return 0;
+               }''', name : 'pthread_setname_np(const char*)')
+  cdata.set('HAVE_PTHREAD_SETNAME_NP_WITHOUT_TID', 1)
+endif
+if cc.has_header_symbol('pthread.h', 'pthread_condattr_setclock')
+  cdata.set('HAVE_PTHREAD_CONDATTR_SETCLOCK', 1)
+endif
+if cc.has_header_symbol('pthread.h', 'pthread_cond_timedwait_relative_np')
+  cdata.set('HAVE_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP', 1)
+endif
 
-assert len(sys.argv) >= 3
-fname = sys.argv[1]
-contents = sys.argv[2]
+# Check for futex(2)
+if cc.compiles('''#include <linux/futex.h>
+               #include <sys/syscall.h>
+               #include <unistd.h>
+               int main (int argc, char ** argv) {
+                 syscall (__NR_futex, NULL, FUTEX_WAKE, FUTEX_WAIT);
+                 return 0;
+               }''', name : 'futex(2) system call')
+  cdata.set('HAVE_FUTEX', 1)
+endif
+if cc.compiles('''#include <linux/futex.h>
+               #include <sys/syscall.h>
+               #include <unistd.h>
+               int main (int argc, char ** argv) {
+                 syscall (__NR_futex_time64, NULL, FUTEX_WAKE, FUTEX_WAIT);
+                 return 0;
+               }''', name : 'futex(2) system call')
+  cdata.set('HAVE_FUTEX_TIME64', 1)
+endif
 
-with open(fname, 'w') as f:
-    f.write(contents)
+# Check for posix timers and monotonic clock
+time_prefix = '#include <time.h>\n'
+if cdata.has('HAVE_UNISTD_H')
+  time_prefix += '#include <unistd.h>'
+endif
+
+posix_timers_src = time_prefix + '''
+#if !defined(_POSIX_TIMERS) || _POSIX_TIMERS < 0 || !defined(CLOCK_REALTIME)
+#error Either _POSIX_TIMERS or CLOCK_REALTIME not defined
+#endif
 '''
-
-configure_file(
-  output : 'GstDocumentedSubprojects',
-  command : [python3,
-             '-c', write_file_contents,
-             '@OUTPUT@',
-             documented_projects]
-)
-
-if documented_projects != ''
-  gst_doc = subproject('gst-docs', required: get_option('doc').enabled())
-  if gst_doc.found()
-    gst_doc_target = gst_doc.get_variable('gstreamer_doc')
-    alias_target('gst-doc', gst_doc_target)
-  endif
-  message('Gst docs subprojects: ' + documented_projects)
+if cc.compiles(posix_timers_src, name : 'posix timers from time.h')
+  cdata.set('HAVE_POSIX_TIMERS', 1)
 endif
 
-all_plugins_paths = []
-all_plugins_dirs = []
-plugins_names = []
-foreach plugin: all_plugins
-  plugin_path = plugin.get_variable('full_path')
-  all_plugins_paths += plugin_path
-  all_plugins_dirs += fs.parent(plugin_path)
-  plugins_names += fs.name(plugin_path)
+monotonic_clock_src = time_prefix + '''
+#if !defined(_POSIX_MONOTONIC_CLOCK) || _POSIX_MONOTONIC_CLOCK < 0 || !defined(CLOCK_MONOTONIC)
+#error Either _POSIX_MONOTONIC_CLOCK or CLOCK_MONOTONIC not defined
+#endif
+'''
+if cc.compiles(monotonic_clock_src, name : 'monotonic clock from time.h')
+  cdata.set('HAVE_MONOTONIC_CLOCK', 1)
+endif
+
+# Check for __uint128_t (gcc) by checking for 128-bit division
+uint128_t_src = '''int main() {
+static __uint128_t v1 = 100;
+static __uint128_t v2 = 10;
+static __uint128_t u;
+u = v1 / v2;
+}'''
+if cc.compiles(uint128_t_src, name : '__uint128_t available')
+  cdata.set('HAVE_UINT128_T', 1)
+endif
+
+# All supported platforms have long long now
+cdata.set('HAVE_LONG_LONG', 1)
+
+# -------------------------------------------------------------------------------------
+# config.h things needed by libcheck
+# -------------------------------------------------------------------------------------
+if cc.has_function('getpid')
+  cdata.set('HAVE_GETPID', 1)
+elif host_system == 'windows' and cc.has_function('_getpid')
+  cdata.set('HAVE_PROCESS_H', 1) # Used by gstreamer too
+  cdata.set('HAVE__GETPID', 1)
+endif
+if cc.has_function('strdup')
+  cdata.set('HAVE_DECL_STRDUP', 1)
+elif host_system == 'windows' and cc.has_function('_strdup')
+  cdata.set('HAVE__STRDUP', 1) # Windows (MSVC)
+endif
+if host_system != 'windows'
+  cdata.set('HAVE_FORK', 1)
+else
+  # libcheck requires HAVE_FORK to be 0 when fork() is not available
+  cdata.set('HAVE_FORK', 0)
+endif
+if cc.has_function('strsignal')
+  cdata.set('HAVE_DECL_STRSIGNAL', 1)
+endif
+# Check for availability of types
+if not cc.has_type('clockid_t', prefix : '#include <time.h>')
+  cdata.set('clockid_t', 'int')
+endif
+if not cc.has_type('timer_t', prefix : '#include <time.h>')
+  cdata.set('timer_t', 'int')
+endif
+if not cc.has_members('struct timespec', 'tv_sec', 'tv_nsec',
+		      prefix : '#include <time.h>')
+  cdata.set('STRUCT_TIMESPEC_DEFINITION_MISSING', 1)
+endif
+if not cc.has_members('struct itimerspec', 'it_interval', 'it_value',
+		      prefix : '#include <time.h>')
+  cdata.set('STRUCT_ITIMERSPEC_DEFINITION_MISSING', 1)
+endif
+if host_system != 'windows'
+  cdata.set('HAVE_PIPE', 1)
+elif cc.has_function('_pipe', prefix : '#include <io.h>')
+  cdata.set('HAVE_PIPE', 1)
+endif
+
+# Platform deps; only ws2_32 and execinfo for now
+platform_deps = []
+if host_system == 'windows'
+  platform_deps = [cc.find_library('ws2_32')]
+endif
+
+building_for_uwp = false
+if host_system == 'windows'
+  # Check whether we're building for UWP apps
+  code = '''
+  #include <windows.h>
+  #if !(WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP) && !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP))
+  #error "Not building for UWP"
+  #endif'''
+  if cc.compiles(code, name : 'building for UWP')
+    building_for_uwp = true
+  endif
+
+  building_for_win7 = cc.compiles('''#include <windows.h>
+      #ifndef WINVER
+      #error "unknown minimum supported OS version"
+      #endif
+      #if (WINVER < _WIN32_WINNT_WIN7)
+      #error "Windows 7 API is not guaranteed"
+      #endif
+      ''',
+      name: 'building for Windows 7')
+
+  if not building_for_win7
+    add_project_arguments([
+      '-D_WIN32_WINNT=_WIN32_WINNT_WIN7',
+      '-DWINVER=_WIN32_WINNT_WIN7',
+    ], language: ['c', 'cpp'])
+  endif
+endif
+
+backtrace_deps = []
+unwind_dep = dependency('libunwind', required : get_option('libunwind'))
+dw_dep = dependency('libdw', required: get_option('libdw'))
+dbghelp_option = get_option('dbghelp')
+if dbghelp_option.enabled() and building_for_uwp
+  error('DbgHelp is not supported for UWP')
+endif
+have_dbghelp = cc.has_header('dbghelp.h', required: dbghelp_option) and cc.has_header('tlhelp32.h', required: dbghelp_option)
+backtrace_deps = [unwind_dep, dw_dep]
+backtrace_source_info = false
+backtrace_minimal = false
+# MSVC debug stack trace support
+if host_system == 'windows' and have_dbghelp and not building_for_uwp
+  cdata.set('HAVE_DBGHELP', 1)
+  backtrace_source_info = true
+# DWARF stack trace support with libunwind and elf-utils
+elif unwind_dep.found()
+  cdata.set('HAVE_UNWIND', 1)
+  if dw_dep.found()
+    cdata.set('HAVE_DW', 1)
+    backtrace_source_info = true
+  endif
+  backtrace_minimal = true
+# Basic backtrace() stack trace support
+elif cc.has_function('backtrace')
+  cdata.set('HAVE_BACKTRACE', 1)
+  backtrace_minimal = true
+endif
+# Print messages about what was enabled
+if not backtrace_source_info
+  if not backtrace_minimal
+    message('NO support for stack traces.')
+  else
+    message('Minimal support for stack traces, no source info.')
+  endif
+endif
+
+if cc.has_header('execinfo.h')
+  if cc.has_function('backtrace', prefix : '#include <execinfo.h>')
+    cdata.set('HAVE_BACKTRACE', 1)
+  else
+    execinfo_dep = cc.find_library('execinfo', required : false)
+    if execinfo_dep.found() and cc.has_function('backtrace', prefix : '#include <execinfo.h>', dependencies : execinfo_dep)
+      cdata.set('HAVE_BACKTRACE', 1)
+      platform_deps += execinfo_dep
+    endif
+  endif
+endif
+
+gst_debug = get_option('gst_debug')
+if not gst_debug
+  add_project_arguments(['-Wno-unused'], language: 'c')
+endif
+
+warning_flags = [
+  '-Wmissing-declarations',
+  '-Wmissing-prototypes',
+  '-Wredundant-decls',
+  '-Wundef',
+  '-Wwrite-strings',
+  '-Wformat',
+  '-Wformat-nonliteral',
+  '-Wformat-security',
+  '-Wold-style-definition',
+  '-Winit-self',
+  '-Wmissing-include-dirs',
+  '-Waddress',
+  '-Waggregate-return',
+  '-Wno-multichar',
+  '-Wvla',
+  '-Wpointer-arith',
+]
+
+foreach extra_arg : warning_flags
+  if cc.has_argument (extra_arg)
+    add_project_arguments([extra_arg], language: 'c')
+  endif
 endforeach
 
-# Work around meson bug: https://github.com/mesonbuild/meson/pull/6770
-pathsep = host_machine.system() == 'windows' ? ';' : ':'
-all_plugins_paths = pathsep.join(all_plugins_paths)
+# Used by the gstutils test
+gmp_dep = cc.find_library('gmp', required : false)
+cdata.set('HAVE_GMP', gmp_dep.found())
+gsl_dep = cc.find_library('gsl', required : false)
+gslcblas_dep = cc.find_library('gslcblas', required : false)
+cdata.set('HAVE_GSL', gsl_dep.found() and gslcblas_dep.found())
+test_deps = [gmp_dep, gsl_dep, gslcblas_dep]
 
-devenv = environment()
-if not building_full
-  devenv.prepend('GST_PLUGIN_PATH', all_plugins_dirs)
+# Used by gstinfo.c
+dl_dep = cc.find_library('dl', required : false)
+cdata.set('HAVE_DLADDR', cc.has_function('dladdr', dependencies : dl_dep))
+cdata.set('GST_ENABLE_EXTRA_CHECKS', not get_option('extra-checks').disabled())
+cdata.set('USE_POISONING', get_option('poisoning'))
+
+configinc = include_directories('.')
+libsinc = include_directories('libs')
+privinc = include_directories('gst')
+
+glib_req = '>= 2.62.0'
+
+# Find dependencies
+glib_dep = dependency('glib-2.0', version: glib_req,
+  fallback: ['glib', 'libglib_dep'])
+gobject_dep = dependency('gobject-2.0')
+gmodule_dep = dependency('gmodule-no-export-2.0')
+if host_system == 'windows'
+    gio_dep = dependency('gio-2.0')
 else
-  # Make sure the current build directory is first in PATH so we prefer tools
-  # built here that links on gst-full instead instead of those built in
-  # subprojects.
-  devenv.prepend('PATH', meson.current_build_dir())
+    gio_dep = [dependency('gio-2.0'),
+               dependency('gio-unix-2.0')]
 endif
-devenv.set('CURRENT_GST', meson.current_source_dir())
-devenv.set('GST_VERSION', meson.project_version())
-devenv.set('GST_ENV', 'gst-' + meson.project_version())
-devenv.set('GST_REGISTRY', meson.current_build_dir() / 'registry.dat')
-devenv.set('GST_PLUGIN_SYSTEM_PATH', '')
-meson.add_devenv(devenv)
 
-generate_plugins_paths = find_program('scripts/generate_plugins_path.py')
-configure_file(
-  output : 'GstPluginsPath.json',
-  command : [generate_plugins_paths,
-             '@OUTPUT@',
-             all_plugins_paths]
-)
+mathlib = cc.find_library('m', required : false)
+# Needed for timer_create/settime/delete
+# Also provides clock_gettime in glibc < 2.17
+rt_lib = cc.find_library('rt', required : false)
 
-if building_full
-  cdata = configuration_data()
-  cdata.set_quoted('GST_API_VERSION', apiversion)
-  cdata.set_quoted('GETTEXT_PACKAGE', 'gstreamer-full-1.0')
-  cdata.set_quoted('PACKAGE_VERSION', gst_version)
-  cdata.set_quoted('GST_PACKAGE_ORIGIN', get_option('package-origin'))
-  configure_file(output : 'config.h', configuration : cdata)
-  configinc = include_directories('.')
-  gst_c_args = ['-DHAVE_CONFIG_H']
+gir = find_program('g-ir-scanner', required : get_option('introspection'))
+gnome = import('gnome')
 
-  # Generate a .c file which declare and register all built plugins
-  all_plugin_names = ';'.join(plugins_names)
+build_gir = gir.found() and (not meson.is_cross_build() or get_option('introspection').enabled())
 
-  static_plugins = get_option('gst-full-plugins')
-  if static_plugins == '*'
-    static_plugins = all_plugin_names
-  endif
-  generate_init_static_plugins = find_program('scripts/generate_init_static_plugins.py')
-  init_static_plugins_c = configure_file(
-    output: 'gstinitstaticplugins.c',
-    command : [generate_init_static_plugins,
-               '-o ' + '@OUTPUT@',
-               '-p ' + static_plugins,
-               '-e ' + get_option('gst-full-elements'),
-               '-t ' + get_option('gst-full-typefind-functions'),
-               '-d ' + get_option('gst-full-device-providers'),
-               '-T ' + get_option('gst-full-dynamic-types'),
-               '--giomodules', ';'.join(giomodules),
-               ]
-  )
+gir_init_section = [ '--add-init-section=extern void gst_init(gint*,gchar**);' + \
+    'g_setenv("GST_REGISTRY_DISABLE", "yes", TRUE);' + \
+    'g_setenv("GST_REGISTRY_1.0", "/no/way/this/exists.reg", TRUE);' + \
+    'g_setenv("GST_PLUGIN_PATH_1_0", "", TRUE);' + \
+    'g_setenv("GST_PLUGIN_SYSTEM_PATH_1_0", "", TRUE);' + \
+    'gst_init(NULL,NULL);', '--quiet']
 
-  gstfull_link_args = cc.get_supported_link_arguments(['-Wl,-Bsymbolic-functions'])
+gst_c_args = ['-DHAVE_CONFIG_H']
 
-  # Get a list of libraries that needs to be exposed in the ABI.
-  exposed_libs = []
-  exposed_deps = []
-  exposed_girs = []
-  incdir_deps = []
-  wanted_libs = ['gstreamer-1.0'] + get_option('gst-full-libraries')
-  all_libs = '*' in wanted_libs
+# FIXME: This is only needed on windows and probably breaks when
+# default_library = 'both'. We should add this flag to static_c_args instead
+# when Meson supports it: https://github.com/mesonbuild/meson/issues/3304
+if get_option('default_library') == 'static'
+  gst_c_args += ['-DGST_STATIC_COMPILATION']
+endif
 
-  foreach pkgname_library : all_libraries
-    pkg_name = pkgname_library[0]
-    lib_def = pkgname_library[1]
+# Used in gst/parse/meson.build and below
+python3 = import('python').find_installation()
 
-    if pkg_name in wanted_libs or all_libs
-      if lib_def.has_key('lib')
-        exposed_deps += dependency(pkg_name)
-        incdir_deps += dependency(pkg_name).partial_dependency(includes: true, sources: true)
-        exposed_libs += [lib_def['lib']]
-      endif
+bashcomp_option = get_option('bash-completion')
+bashcomp_dep = dependency('bash-completion', version : '>= 2.0', required : bashcomp_option)
+bash_completions_dir = ''
+bash_helpers_dir = ''
 
-      if lib_def.has_key('gir')
-        exposed_girs += lib_def['gir']
-      endif
-    endif
-  endforeach
-
-  # glib and gobject are part of our public API. If we are using glib from the
-  # system then our pkg-config file must require it. If we built it as
-  # subproject then we need to link_whole it.
-  glib_deps = []
-  glib_dep = dependency('glib-2.0')
-  gobject_dep = dependency('gobject-2.0')
-  if gobject_dep.type_name() == 'internal'
-    glib_subproject = subproject('glib')
-    exposed_libs += glib_subproject.get_variable('libglib')
-    exposed_libs += glib_subproject.get_variable('libgobject')
-    incdir_deps += [
-      glib_dep.partial_dependency(includes: true),
-      gobject_dep.partial_dependency(includes: true),
-    ]
-  else
-    glib_deps = [glib_dep, gobject_dep]
-  endif
-
-  link_deps = []
-  if get_option('gst-full-version-script') != ''
-    symbol_map = meson.current_source_dir() / get_option('gst-full-version-script')
-    link_arg = '-Wl,--version-script=' + symbol_map
-    if cc.has_link_argument(link_arg)
-      gstfull_link_args += link_arg
-      link_deps += symbol_map
-    elif cc.get_id() == 'msvc'
-      warning('FIXME: Provide a def file to publish the public symbols')
+bashcomp_found = false
+if bashcomp_dep.found()
+  bashcomp_found = true
+  bashcomp_dir_override = bashcomp_dep.version().version_compare('>= 2.10') ? ['datadir', datadir] : ['prefix', prefix]
+  bash_completions_dir = bashcomp_dep.get_variable('completionsdir', pkgconfig_define:  bashcomp_dir_override)
+  if bash_completions_dir == ''
+    msg = 'Found bash-completion but the .pc file did not set \'completionsdir\'.'
+    if bashcomp_option.enabled()
+      error(msg)
     else
-      warning('FIXME: Linker does not support the supplied version script (' + symbol_map + '), please disable the "gst-full-version-script" option')
+      message(msg)
     endif
+    bashcomp_found = false
   endif
 
-  giomodules_deps = []
-  foreach module : giomodules
-    giomodules_deps += dependency(module)
-  endforeach
-
-  # Build both shared and static library
-  gstfull = both_libraries('gstreamer-full-1.0',
-    init_static_plugins_c,
-    link_args: gstfull_link_args,
-    link_whole : exposed_libs,
-    dependencies : [incdir_deps, glib_deps, all_plugins, giomodules_deps],
-    link_depends : link_deps,
-    install : true,
-  )
-
-  gst_full_dep = declare_dependency(link_with: gstfull.get_shared_lib(),
-    dependencies : incdir_deps + glib_deps,
-    include_directories: include_directories('.')
-  )
-
-  gst_full_libs_private = cc.get_supported_link_arguments(['-Wl,--undefined=gst_init_static_plugins'])
-  if gst_full_libs_private == []
-    warning('The compiler does not support `-Wl,--undefined` linker flag. The method `gst_init_static_plugins` might be dropped during the link stage of an application using libgstreamer-full-1.0.a, preventing plugins registration.')
-  endif
-
-  if not get_option('introspection').disabled()
-    built_girs = {}
-    foreach gir: exposed_girs
-      includes = []
-      foreach include: gir.get('includes', [])
-        includes += [built_girs.get(include, include)]
-      endforeach
-
-      gir += {
-        'includes': includes,
-        'extra_args': gir.get('extra_args', []) + ['--add-include-path=' + meson.current_build_dir()],
-        'install': true,
-      }
-      built_girs += {gir.get('namespace') + '-' + gir.get('nsversion'): gnome.generate_gir(gstfull, kwargs: gir)[0]}
-    endforeach
-  endif
-
-  pkgconfig.generate(gstfull,
-    requires: glib_deps,
-    libraries_private: gst_full_libs_private,
-    subdirs : 'gstreamer-1.0')
-  meson.override_dependency('gstreamer-full-1.0', gst_full_dep)
-
-  if not get_option('tools').disabled()
-    foreach tool, data: all_tools
-      exe_name = '@0@-@1@'.format(tool, apiversion)
-      extra_args = data.get('extra_c_args', [])
-      sources = data.get('files')
-      install_tag = data.get('install_tag', 'bin')
-      deps = []
-      foreach d : data.get('deps', [])
-        if d not in exposed_deps
-          deps += d
-        endif
-      endforeach
-
-      executable(exe_name,
-        sources,
-        install: true,
-        install_tag: install_tag,
-        include_directories : [configinc],
-        dependencies : [gst_full_dep] + deps,
-        c_args: extra_args + gst_c_args + ['-DG_LOG_DOMAIN="@0@"'.format(exe_name)],
-      )
-
-      if data.has_key('man_page')
-        install_man(data.get('man_page'))
-      endif
-
-    endforeach
+  bash_helpers_dir = bashcomp_dep.get_variable('helpersdir', pkgconfig_define:  bashcomp_dir_override)
+  if bash_helpers_dir == ''
+    msg = 'Found bash-completion, but the .pc file did not set \'helpersdir\'.'
+    if bashcomp_option.enabled()
+      error(msg)
+    else
+      message(msg)
+    endif
+    bashcomp_found = false
   endif
 endif
 
-message('Building subprojects: ' + ', '.join(subprojects_names))
+plugins_install_dir = join_paths(get_option('libdir'), 'gstreamer-1.0')
 
-setenv = find_program('gst-env.py')
+pkgconfig = import('pkgconfig')
+plugins_pkgconfig_install_dir = join_paths(plugins_install_dir, 'pkgconfig')
+if get_option('default_library') == 'shared'
+  # If we don't build static plugins there is no need to generate pc files
+  plugins_pkgconfig_install_dir = disabler()
+endif
+pkgconfig_variables = [
+  'exec_prefix=${prefix}',
+  'toolsdir=${exec_prefix}/bin',
+  'pluginsdir=${libdir}/gstreamer-1.0',
+  'girdir=${datadir}/gir-1.0',
+  'typelibdir=${libdir}/girepository-1.0',
+  'pluginscannerdir=${libexecdir}/gstreamer-1.0'
+]
+pkgconfig_uninstalled_variables = ['exec_prefix=${prefix}',
+	'gstreamerdir=${prefix}/subprojects/gstreamer',
+    'bashhelpersdir=${gstreamerdir}/data/bash-completion/helpers',
+    'helpersdir=${gstreamerdir}/libs/gst/helpers']
+pkgconfig_subdirs = ['gstreamer-1.0']
+pkgconfig_libs = []
+if host_system == 'darwin'
+  pkgconfig_libs = ['-Wl,-rpath,${libdir}']
+endif
 
-devenv_cmd = [setenv, '--builddir=@0@'.format(meson.global_build_root()),
-              '--srcdir=@0@'.format(meson.global_source_root())]
-
+static_build = get_option('default_library') == 'static'
+gst_libraries = []
+subdir('gst')
+subdir('libs')
+subdir('plugins')
+subdir('tools')
 subdir('tests')
-subdir('ci/fuzzing')
+subdir('data')
+subdir('docs')
 
-if meson.can_run_host_binaries() and build_machine.system() == 'linux' and host_machine.system() == 'windows'
-  # FIXME: Ideally we could get the wrapper directly from meson
-  devenv_cmd += ['--wine', host_machine.cpu_family() == 'x86_64' ? 'wine64' : 'wine32']
-  sysroot = meson.get_cross_property('sys_root')
-  if sysroot != ''
-    # Logic from meson
-    devenv_cmd += ['--winepath', 'Z:' + join_paths(sysroot, 'bin')]
-  endif
-endif
-
-run_target('devenv', command : devenv_cmd)
-
-if orc_subproject.found() and orc_update_targets.length() > 0
-  alias_target('update-orc-dist', orc_update_targets)
+# xgettext is optional (on Windows for instance)
+if find_program('xgettext', required : get_option('nls')).found()
+  cdata.set('ENABLE_NLS', 1)
+  subdir('po')
 endif
 
 subdir('scripts')
 
-dotnet_format = find_program('dotnet-format', required: false)
-if dotnet_format.found()
-    run_target('csharp_format_check',
-        command: [join_paths(meson.current_source_dir(), 'scripts', 'format-csharp'),
-            '--check'
-        ],
-    )
-    run_target('csharp_format_apply',
-        command: [join_paths(meson.current_source_dir(), 'scripts', 'format-csharp'),
-        ],
-    )
+# Set release date
+if gst_version_nano == 0
+  extract_release_date = find_program('scripts/extract-release-date-from-doap-file.py')
+  run_result = run_command(extract_release_date, gst_version, files('gstreamer.doap'), check: true)
+  release_date = run_result.stdout().strip()
+  cdata.set_quoted('GST_PACKAGE_RELEASE_DATETIME', release_date)
+  message('Package release date: ' + release_date)
 endif
 
-summary({
-  'gstreamer-full library': building_full,
-}, section: 'Build options', bool_yn: true, list_sep: '  ')
+configure_file(output : 'config.h', configuration : cdata)
+install_data('gst-element-check-1.0.m4', install_dir : join_paths(get_option('datadir'), 'aclocal'))
 
-gst_tools = []
-foreach tool, data: all_tools
-  gst_tools += tool
+meson.add_dist_script('scripts/gen-changelog.py', meson.project_name(), '1.20.0', meson.project_version())
+
+plugin_names = []
+gst_plugins = []
+foreach plugin: plugins
+  pkgconfig.generate(plugin, install_dir: plugins_pkgconfig_install_dir)
+  dep = declare_dependency(link_with: plugin, variables: {'full_path': plugin.full_path()})
+  meson.override_dependency(plugin.name(), dep)
+  gst_plugins += [dep]
+  if plugin.name().startswith('gst')
+    plugin_names += [plugin.name().substring(3)]
+  else
+    plugin_names += [plugin.name()]
+  endif
 endforeach
 
 summary({
-    'Tools': gst_tools,
-}, section: 'Build options', list_sep: ', ')
+    'Plugins': plugin_names,
+}, list_sep: ', ')
