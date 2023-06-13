@@ -405,23 +405,41 @@ gst_d3d11_d2d1_prepare_output_buffer(GstBaseTransform* trans, GstBuffer* input, 
     Gstd3d11d2d1* d2d1 = GST_D3D11D2D1(trans);
     GstFlowReturn ret = GST_FLOW_OK;
 
-    if (outbuf == NULL)
-        return GST_FLOW_OK;
-
-
+    D3D11_TEXTURE2D_DESC desc;
     GstStructure* config;
-    GstAllocator* allocator = NULL;
+    GstMemory* memory;
     GstBufferPool* pool = d2d1->priv_pool;
+    GstBuffer* buf;
 
-    GstAllocationParams* params = NULL;
-    GstBufferPoolAcquireParams acquire_params = {0};
+    GstD3D11Allocator* alloc;
+    GstD3D11PoolAllocator* pool_alloc;
+    GstD3D11AllocationParams* d3d11_params;
+
     config = gst_buffer_pool_get_config(pool);
 
-    gst_buffer_pool_config_get_allocator(config, &allocator, params);
+    d3d11_params = gst_buffer_pool_config_get_d3d11_allocation_params(config);
+    GstVideoInfo* info = &d3d11_params->info;
 
-    //if (GST_BUFFER_POOL_CLASS(parent_class)->alloc_buffer != NULL) {
-    ret = gst_d3d11_buffer_pool_alloc_buffer(pool, outbuf, &acquire_params);
-    //}
+    alloc = (GstD3D11Allocator*)gst_d3d11_pool_allocator_new(filter->device, &d3d11_params->desc[0]);
+    if (!gst_d3d11_allocator_set_active(alloc, TRUE)) {
+        //GST_ERROR("Failed to activate allocator");
+        gst_object_unref(alloc);
+        return GST_FLOW_ERROR;
+    }
+
+    pool_alloc = GST_D3D11_POOL_ALLOCATOR(alloc);
+    ret = gst_d3d11_pool_allocator_acquire_memory(pool_alloc, &memory);
+
+    *outbuf = gst_buffer_new();
+
+    gst_buffer_add_video_meta_full(*outbuf, GST_VIDEO_FRAME_FLAG_NONE,
+        GST_VIDEO_INFO_FORMAT(info), GST_VIDEO_INFO_WIDTH(info),
+        GST_VIDEO_INFO_HEIGHT(info), GST_VIDEO_INFO_N_PLANES(info),
+        info->offset, info->stride);
+
+    gst_buffer_append_memory(*outbuf, memory);
+
+    //*outbuf = buf;
 
     return ret;
 }
