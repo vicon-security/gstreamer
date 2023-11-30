@@ -23,7 +23,7 @@ d3d11_sources = [
 ]
 
 extra_c_args = ['-DCOBJMACROS']
-extra_args = ['-DGST_USE_UNSTABLE_API']
+extra_args = ['-DGST_USE_UNSTABLE_API', '/bigobj']
 extra_dep = []
 
 d3d11_option = get_option('d3d11')
