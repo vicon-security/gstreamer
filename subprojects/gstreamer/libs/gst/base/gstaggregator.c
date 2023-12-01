@@ -962,7 +962,9 @@ gst_aggregator_do_events_and_queries (GstElement * self, GstPad * epad,
   GstAggregatorClass *klass = NULL;
   DoHandleEventsAndQueriesData *data = user_data;
 
-  do {
+  for(;;) {
+    gboolean ret;
+
     event = NULL;
     query = NULL;
 
@@ -970,49 +972,51 @@ gst_aggregator_do_events_and_queries (GstElement * self, GstPad * epad,
     if (pad->priv->clipped_buffer == NULL &&
         !GST_IS_BUFFER (g_queue_peek_tail (&pad->priv->data))) {
       if (GST_IS_EVENT (g_queue_peek_tail (&pad->priv->data)))
-        event = gst_event_ref (g_queue_peek_tail (&pad->priv->data));
+        event = g_queue_peek_tail (&pad->priv->data);
       if (GST_IS_QUERY (g_queue_peek_tail (&pad->priv->data)))
         query = g_queue_peek_tail (&pad->priv->data);
     }
     PAD_UNLOCK (pad);
-    if (event || query) {
-      gboolean ret;
 
-      data->processed_event = TRUE;
-      if (klass == NULL)
-        klass = GST_AGGREGATOR_GET_CLASS (self);
+    if (event == NULL && query == NULL)
+      break;
 
-      if (event) {
-        GST_LOG_OBJECT (pad, "Processing %" GST_PTR_FORMAT, event);
-        gst_event_ref (event);
-        ret = klass->sink_event (aggregator, pad, event);
+    data->processed_event = TRUE;
+    if (klass == NULL)
+      klass = GST_AGGREGATOR_GET_CLASS (self);
 
-        PAD_LOCK (pad);
-        if (GST_EVENT_TYPE (event) == GST_EVENT_CAPS) {
-          pad->priv->negotiated = ret;
-        }
-        if (g_queue_peek_tail (&pad->priv->data) == event)
-          gst_event_unref (g_queue_pop_tail (&pad->priv->data));
-        gst_event_unref (event);
-      } else if (query) {
-        GST_LOG_OBJECT (pad, "Processing %" GST_PTR_FORMAT, query);
-        ret = klass->sink_query (aggregator, pad, query);
+    if (event) {
+      GST_LOG_OBJECT (pad, "Processing %" GST_PTR_FORMAT, event);
+      gst_event_ref (event);
+      ret = klass->sink_event (aggregator, pad, event);
 
-        PAD_LOCK (pad);
-        if (g_queue_peek_tail (&pad->priv->data) == query) {
-          GstStructure *s;
-
-          s = gst_query_writable_structure (query);
-          gst_structure_set (s, "gst-aggregator-retval", G_TYPE_BOOLEAN, ret,
-              NULL);
-          g_queue_pop_tail (&pad->priv->data);
-        }
+      PAD_LOCK (pad);
+      if (GST_EVENT_TYPE (event) == GST_EVENT_CAPS) {
+	pad->priv->negotiated = ret;
       }
+      if (g_queue_peek_tail (&pad->priv->data) == event) {
+	gst_event_unref (g_queue_pop_tail (&pad->priv->data));
+	event = NULL;
+      }
+    } else if (query) {
+      GST_LOG_OBJECT (pad, "Processing %" GST_PTR_FORMAT, query);
+      ret = klass->sink_query (aggregator, pad, query);
 
-      PAD_BROADCAST_EVENT (pad);
-      PAD_UNLOCK (pad);
+      PAD_LOCK (pad);
+      if (g_queue_peek_tail (&pad->priv->data) == query) {
+	GstStructure *s;
+
+	s = gst_query_writable_structure (query);
+	gst_structure_set (s, "gst-aggregator-retval", G_TYPE_BOOLEAN, ret,
+			   NULL);
+	gst_query_unref (g_queue_pop_tail (&pad->priv->data));
+	query = NULL;
+      }
     }
-  } while (event || query);
+
+    PAD_BROADCAST_EVENT (pad);
+    PAD_UNLOCK (pad);
+  }
 
   return TRUE;
 }
@@ -1093,8 +1097,7 @@ gst_aggregator_pad_set_flushing (GstAggregatorPad * aggpad,
         GST_EVENT_TYPE (item->data) == GST_EVENT_EOS ||
         GST_EVENT_TYPE (item->data) == GST_EVENT_SEGMENT ||
         !GST_EVENT_IS_STICKY (item->data)) {
-      if (!GST_IS_QUERY (item->data))
-        gst_mini_object_unref (item->data);
+      gst_mini_object_unref (item->data);
       g_queue_delete_link (&aggpad->priv->data, item);
     }
     item = next;
@@ -1866,7 +1869,7 @@ gst_aggregator_default_sink_event_pre_queue (GstAggregator * self,
     }
 
     GST_DEBUG_OBJECT (aggpad, "Store event in queue: %" GST_PTR_FORMAT, event);
-    g_queue_push_head (&aggpad->priv->data, event);
+    g_queue_push_head (&aggpad->priv->data, gst_event_ref (event));
     SRC_BROADCAST (self);
     PAD_UNLOCK (aggpad);
     SRC_UNLOCK (self);
@@ -2631,7 +2634,7 @@ gst_aggregator_default_sink_query_pre_queue (GstAggregator * self,
       goto flushing;
     }
 
-    g_queue_push_head (&aggpad->priv->data, query);
+    g_queue_push_head (&aggpad->priv->data, gst_query_ref (query));
     SRC_BROADCAST (self);
     SRC_UNLOCK (self);
 
@@ -2644,8 +2647,10 @@ gst_aggregator_default_sink_query_pre_queue (GstAggregator * self,
     s = gst_query_writable_structure (query);
     if (gst_structure_get_boolean (s, "gst-aggregator-retval", &ret))
       gst_structure_remove_field (s, "gst-aggregator-retval");
-    else
+    else {
       g_queue_remove (&aggpad->priv->data, query);
+      gst_query_unref (query);
+    }
 
     if (aggpad->priv->flow_return != GST_FLOW_OK)
       goto flushing;
@@ -3156,6 +3161,7 @@ gst_aggregator_pad_chain_internal (GstAggregator * self,
       }
       apply_buffer (aggpad, buffer, head);
       aggpad->priv->num_buffers++;
+      /* Ownership is taken by the aggpad->priv->data queue */
       buffer = NULL;
       SRC_BROADCAST (self);
       break;
