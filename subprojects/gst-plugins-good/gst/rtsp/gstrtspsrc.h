@@ -91,12 +91,34 @@ struct _GstRTSPConnInfo {
   GMutex              recv_lock;
 };
 
-typedef struct _GstRTSPStream GstRTSPStream;
+/**
+ * GstRTSPSrcTimeoutCause:
+ * @GST_RTSP_SRC_TIMEOUT_CAUSE_RTCP: timeout triggered by RTCP
+ *
+ * Different causes to why the rtspsrc generated the GstRTSPSrcTimeout
+ * message.
+ */
+typedef enum
+{
+  GST_RTSP_SRC_TIMEOUT_CAUSE_RTCP
+} GstRTSPSrcTimeoutCause;
 
-struct _GstRTSPStream {
+/**
+ * GstRTSPNatMethod:
+ * @GST_RTSP_NAT_NONE: none
+ * @GST_RTSP_NAT_DUMMY: send dummy packets
+ *
+ * Different methods for trying to traverse firewalls.
+ */
+typedef enum
+{
+  GST_RTSP_NAT_NONE,
+  GST_RTSP_NAT_DUMMY
+} GstRTSPNatMethod;
+
+typedef struct _GstRTSPStream {
+  GstObject     object;
   gint          id;
-
-  GstRTSPSrc   *parent; /* parent, no extra ref to parent is taken */
 
   /* pad we expose or NULL when it does not have an actual pad */
   GstPad       *srcpad;
@@ -169,33 +191,7 @@ struct _GstRTSPStream {
   GstStructure     *rtx_pt_map;
 
   guint32       segment_seqnum[2];
-};
-
-/**
- * GstRTSPSrcTimeoutCause:
- * @GST_RTSP_SRC_TIMEOUT_CAUSE_RTCP: timeout triggered by RTCP
- *
- * Different causes to why the rtspsrc generated the GstRTSPSrcTimeout
- * message.
- */
-typedef enum
-{
-  GST_RTSP_SRC_TIMEOUT_CAUSE_RTCP
-} GstRTSPSrcTimeoutCause;
-
-/**
- * GstRTSPNatMethod:
- * @GST_RTSP_NAT_NONE: none
- * @GST_RTSP_NAT_DUMMY: send dummy packets
- *
- * Different methods for trying to traverse firewalls.
- */
-typedef enum
-{
-  GST_RTSP_NAT_NONE,
-  GST_RTSP_NAT_DUMMY
-} GstRTSPNatMethod;
-
+} GstRTSPStream;
 
 struct _GstRTSPSrc {
   GstBin           parent;
@@ -228,6 +224,7 @@ struct _GstRTSPSrc {
   GstSDPMessage   *sdp;
   gboolean         from_sdp;
   GList           *streams;
+  guint32          streams_cookie;
   GstStructure    *props;
   gboolean         need_activate;
 
@@ -330,6 +327,10 @@ struct _GstRTSPSrc {
   guint group_id;
   GMutex group_lock;
 };
+
+typedef struct _GstRTSPStreamClass {
+  GstObjectClass derivable;
+} GstRTSPStreamClass;
 
 struct _GstRTSPSrcClass {
   GstBinClass parent_class;
