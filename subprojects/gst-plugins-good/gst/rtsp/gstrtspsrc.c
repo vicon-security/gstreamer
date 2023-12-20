@@ -120,8 +120,8 @@
 GST_DEBUG_CATEGORY_STATIC (rtspsrc_debug);
 #define GST_CAT_DEFAULT (rtspsrc_debug)
 
-GType gst_rtsp_stream_get_type(void);
-G_DEFINE_TYPE(GstRTSPStream, gst_rtsp_stream, GST_TYPE_OBJECT);
+GType gst_rtsp_stream_get_type (void);
+G_DEFINE_TYPE (GstRTSPStream, gst_rtsp_stream, GST_TYPE_OBJECT);
 
 static GstStaticPadTemplate rtptemplate = GST_STATIC_PAD_TEMPLATE ("stream_%u",
     GST_PAD_SRC,
@@ -580,7 +580,7 @@ before_send_accum (GSignalInvocationHint * ihint,
 }
 
 static void
-gst_rtspsrc_class_init (GstRTSPSrcClass *klass)
+gst_rtspsrc_class_init (GstRTSPSrcClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
@@ -1346,7 +1346,7 @@ gst_rtspsrc_class_init (GstRTSPSrcClass *klass)
 }
 
 static gboolean
-validate_set_get_parameter_name (const gchar *parameter_name)
+validate_set_get_parameter_name (const gchar * parameter_name)
 {
   gchar *ptr = (gchar *) parameter_name;
 
@@ -1362,7 +1362,7 @@ validate_set_get_parameter_name (const gchar *parameter_name)
 }
 
 static gboolean
-validate_set_get_parameters (gchar **parameter_names)
+validate_set_get_parameters (gchar ** parameter_names)
 {
   while (*parameter_names) {
     if (!validate_set_get_parameter_name (*parameter_names)) {
@@ -1374,8 +1374,8 @@ validate_set_get_parameters (gchar **parameter_names)
 }
 
 static gboolean
-get_parameter (GstRTSPSrc *src, const gchar *parameter,
-    const gchar *content_type, GstPromise *promise)
+get_parameter (GstRTSPSrc * src, const gchar * parameter,
+    const gchar * content_type, GstPromise * promise)
 {
   gchar *parameters[] = { (gchar *) parameter, NULL };
 
@@ -1390,8 +1390,8 @@ get_parameter (GstRTSPSrc *src, const gchar *parameter,
 }
 
 static gboolean
-get_parameters (GstRTSPSrc *src, gchar **parameters,
-    const gchar *content_type, GstPromise *promise)
+get_parameters (GstRTSPSrc * src, gchar ** parameters,
+    const gchar * content_type, GstPromise * promise)
 {
   ParameterRequest *req;
 
@@ -1433,8 +1433,8 @@ get_parameters (GstRTSPSrc *src, gchar **parameters,
 }
 
 static gboolean
-set_parameter (GstRTSPSrc *src, const gchar *name, const gchar *value,
-    const gchar *content_type, GstPromise *promise)
+set_parameter (GstRTSPSrc * src, const gchar * name, const gchar * value,
+    const gchar * content_type, GstPromise * promise)
 {
   ParameterRequest *req;
 
@@ -1474,7 +1474,7 @@ set_parameter (GstRTSPSrc *src, const gchar *name, const gchar *value,
 }
 
 static void
-gst_rtspsrc_init (GstRTSPSrc *src)
+gst_rtspsrc_init (GstRTSPSrc * src)
 {
   src->conninfo.location = g_strdup (DEFAULT_LOCATION);
   src->protocols = DEFAULT_PROTOCOLS;
@@ -1547,7 +1547,7 @@ gst_rtspsrc_init (GstRTSPSrc *src)
   g_cond_init (&src->cmd_cond);
 
   g_mutex_init (&src->group_lock);
-  g_mutex_init(&src->streams_lock);
+  g_mutex_init (&src->streams_lock);
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
   gst_bin_set_suppressed_flags (GST_BIN (src),
@@ -1555,7 +1555,7 @@ gst_rtspsrc_init (GstRTSPSrc *src)
 }
 
 static void
-free_param_data (ParameterRequest *req)
+free_param_data (ParameterRequest * req)
 {
   gst_promise_unref (req->promise);
   if (req->body)
@@ -1565,7 +1565,7 @@ free_param_data (ParameterRequest *req)
 }
 
 static void
-gst_rtspsrc_finalize (GObject *object)
+gst_rtspsrc_finalize (GObject * object)
 {
   GstRTSPSrc *rtspsrc;
 
@@ -1614,7 +1614,7 @@ gst_rtspsrc_finalize (GObject *object)
 }
 
 static GstClock *
-gst_rtspsrc_provide_clock (GstElement *element)
+gst_rtspsrc_provide_clock (GstElement * element)
 {
   GstRTSPSrc *src = GST_RTSPSRC (element);
   GstClock *clock;
@@ -1627,7 +1627,7 @@ gst_rtspsrc_provide_clock (GstElement *element)
 
 /* a proxy string of the format [user:passwd@]host[:port] */
 static gboolean
-gst_rtspsrc_set_proxy (GstRTSPSrc *rtsp, const gchar *proxy)
+gst_rtspsrc_set_proxy (GstRTSPSrc * rtsp, const gchar * proxy)
 {
   gchar *p, *at, *col;
 
@@ -1686,14 +1686,14 @@ gst_rtspsrc_set_proxy (GstRTSPSrc *rtsp, const gchar *proxy)
 }
 
 static void
-gst_rtspsrc_set_tcp_timeout (GstRTSPSrc *rtspsrc, guint64 timeout)
+gst_rtspsrc_set_tcp_timeout (GstRTSPSrc * rtspsrc, guint64 timeout)
 {
   rtspsrc->tcp_timeout = timeout;
 }
 
 static void
-gst_rtspsrc_set_property (GObject *object, guint prop_id, const GValue *value,
-    GParamSpec *pspec)
+gst_rtspsrc_set_property (GObject * object, guint prop_id, const GValue * value,
+    GParamSpec * pspec)
 {
   GstRTSPSrc *rtspsrc;
 
@@ -1877,8 +1877,8 @@ gst_rtspsrc_set_property (GObject *object, guint prop_id, const GValue *value,
 }
 
 static void
-gst_rtspsrc_get_property (GObject *object, guint prop_id, GValue *value,
-    GParamSpec *pspec)
+gst_rtspsrc_get_property (GObject * object, guint prop_id, GValue * value,
+    GParamSpec * pspec)
 {
   GstRTSPSrc *rtspsrc;
 
@@ -2050,8 +2050,8 @@ gst_rtspsrc_get_property (GObject *object, guint prop_id, GValue *value,
 }
 
 static const GstSDPBandwidth *
-gst_rtspsrc_get_bandwidth (GstRTSPSrc *src, const GstSDPMessage *sdp,
-    const GstSDPMedia *media, const gchar *type)
+gst_rtspsrc_get_bandwidth (GstRTSPSrc * src, const GstSDPMessage * sdp,
+    const GstSDPMedia * media, const gchar * type)
 {
   guint i, len;
 
@@ -2075,8 +2075,8 @@ gst_rtspsrc_get_bandwidth (GstRTSPSrc *src, const GstSDPMessage *sdp,
 }
 
 static void
-gst_rtspsrc_collect_bandwidth (GstRTSPSrc *src, const GstSDPMessage *sdp,
-    const GstSDPMedia *media, GstRTSPStream *stream)
+gst_rtspsrc_collect_bandwidth (GstRTSPSrc * src, const GstSDPMessage * sdp,
+    const GstSDPMedia * media, GstRTSPStream * stream)
 {
   const GstSDPBandwidth *bw;
 
@@ -2097,8 +2097,8 @@ gst_rtspsrc_collect_bandwidth (GstRTSPSrc *src, const GstSDPMessage *sdp,
 }
 
 static void
-gst_rtspsrc_do_stream_connection (GstRTSPSrc *src, GstRTSPStream *stream,
-    const GstSDPConnection *conn)
+gst_rtspsrc_do_stream_connection (GstRTSPSrc * src, GstRTSPStream * stream,
+    const GstSDPConnection * conn)
 {
   if (conn->nettype == NULL || strcmp (conn->nettype, "IN") != 0)
     return;
@@ -2131,8 +2131,8 @@ gst_rtspsrc_do_stream_connection (GstRTSPSrc *src, GstRTSPStream *stream,
  * - If we are dealing with a localhost address, we disable multicast
  */
 static void
-gst_rtspsrc_collect_connections (GstRTSPSrc *src, const GstSDPMessage *sdp,
-    const GstSDPMedia *media, GstRTSPStream *stream)
+gst_rtspsrc_collect_connections (GstRTSPSrc * src, const GstSDPMessage * sdp,
+    const GstSDPMedia * media, GstRTSPStream * stream)
 {
   const GstSDPConnection *conn;
   guint i, len;
@@ -2151,7 +2151,7 @@ gst_rtspsrc_collect_connections (GstRTSPSrc *src, const GstSDPMessage *sdp,
 }
 
 static gchar *
-make_stream_id (GstRTSPStream *stream, const GstSDPMedia *media)
+make_stream_id (GstRTSPStream * stream, const GstSDPMedia * media)
 {
   gchar *stream_id =
       g_strdup_printf ("%s:%d:%d:%s:%d", media->media, media->port,
@@ -2165,8 +2165,8 @@ make_stream_id (GstRTSPStream *stream, const GstSDPMedia *media)
 /*   m=<media> <UDP port> RTP/AVP <payload>
  */
 static void
-gst_rtspsrc_collect_payloads (GstRTSPSrc *src, const GstSDPMessage *sdp,
-    const GstSDPMedia *media, GstRTSPStream *stream)
+gst_rtspsrc_collect_payloads (GstRTSPSrc * src, const GstSDPMessage * sdp,
+    const GstSDPMedia * media, GstRTSPStream * stream)
 {
   guint i, len;
   const gchar *proto;
@@ -2277,7 +2277,7 @@ sendonly_media:
 }
 
 static const gchar *
-get_aggregate_control (GstRTSPSrc *src)
+get_aggregate_control (GstRTSPSrc * src)
 {
   const gchar *base;
 
@@ -2294,7 +2294,7 @@ get_aggregate_control (GstRTSPSrc *src)
 }
 
 static gint
-find_stream_by_id (GstRTSPStream *stream, gint *id)
+find_stream_by_id (GstRTSPStream * stream, gint * id)
 {
   if (stream->id == *id)
     return 0;
@@ -2303,7 +2303,7 @@ find_stream_by_id (GstRTSPStream *stream, gint *id)
 }
 
 static gint
-find_stream_by_channel (GstRTSPStream *stream, gint *channel)
+find_stream_by_channel (GstRTSPStream * stream, gint * channel)
 {
   /* ignore unconfigured channels here (e.g., those that
    * were explicitly skipped during SETUP) */
@@ -2315,7 +2315,7 @@ find_stream_by_channel (GstRTSPStream *stream, gint *channel)
 }
 
 static gint
-find_stream_by_udpsrc (GstRTSPStream *stream, gconstpointer a)
+find_stream_by_udpsrc (GstRTSPStream * stream, gconstpointer a)
 {
   GstElement *src = (GstElement *) a;
 
@@ -2328,7 +2328,7 @@ find_stream_by_udpsrc (GstRTSPStream *stream, gconstpointer a)
 }
 
 static gint
-find_stream_by_setup (GstRTSPStream *stream, gconstpointer a)
+find_stream_by_setup (GstRTSPStream * stream, gconstpointer a)
 {
   if (stream->conninfo.location) {
     /* check qualified setup_url */
@@ -2349,7 +2349,7 @@ find_stream_by_setup (GstRTSPStream *stream, gconstpointer a)
 }
 
 static GstRTSPStream *
-find_stream_locked (GstRTSPSrc *src, gconstpointer data, gconstpointer func)
+find_stream_locked (GstRTSPSrc * src, gconstpointer data, gconstpointer func)
 {
   GList *lstream;
 
@@ -2361,55 +2361,55 @@ find_stream_locked (GstRTSPSrc *src, gconstpointer data, gconstpointer func)
 }
 
 static void
-gst_rtsp_stream_finalize(GObject *object)
+gst_rtsp_stream_finalize (GObject * object)
 {
-  GstRTSPStream* stream = (GstRTSPStream*)object;
+  GstRTSPStream *stream = (GstRTSPStream *) object;
 
-  g_array_free(stream->ptmap, TRUE);
+  g_array_free (stream->ptmap, TRUE);
 
-  g_free(stream->destination);
-  g_free(stream->control_url);
-  g_free(stream->conninfo.location);
-  g_free(stream->stream_id);
+  g_free (stream->destination);
+  g_free (stream->control_url);
+  g_free (stream->conninfo.location);
+  g_free (stream->stream_id);
 
   if (stream->srtpenc)
-    gst_object_unref(stream->srtpenc);
+    gst_object_unref (stream->srtpenc);
   if (stream->srtpdec)
-    gst_object_unref(stream->srtpdec);
+    gst_object_unref (stream->srtpdec);
   if (stream->srtcpparams)
-    gst_caps_unref(stream->srtcpparams);
+    gst_caps_unref (stream->srtcpparams);
   if (stream->mikey)
-    gst_mikey_message_unref(stream->mikey);
+    gst_mikey_message_unref (stream->mikey);
   if (stream->rtcppad)
-    gst_object_unref(stream->rtcppad);
+    gst_object_unref (stream->rtcppad);
   if (stream->session)
-    g_object_unref(stream->session);
+    g_object_unref (stream->session);
   if (stream->rtx_pt_map)
-    gst_structure_free(stream->rtx_pt_map);
+    gst_structure_free (stream->rtx_pt_map);
 
-  g_mutex_clear(&stream->conninfo.send_lock);
-  g_mutex_clear(&stream->conninfo.recv_lock);
+  g_mutex_clear (&stream->conninfo.send_lock);
+  g_mutex_clear (&stream->conninfo.recv_lock);
 
-  G_OBJECT_CLASS(gst_rtsp_stream_parent_class)->finalize(object);
+  G_OBJECT_CLASS (gst_rtsp_stream_parent_class)->finalize (object);
 }
 
 static void
-gst_rtsp_stream_class_init (GstRTSPStreamClass *klass)
+gst_rtsp_stream_class_init (GstRTSPStreamClass * klass)
 {
-  GObjectClass* gobject_class = (GObjectClass*)klass;
+  GObjectClass *gobject_class = (GObjectClass *) klass;
 
   gobject_class->finalize = gst_rtsp_stream_finalize;
 }
 
 static void
-clear_ptmap_item (PtMapItem *item)
+clear_ptmap_item (PtMapItem * item)
 {
   if (item->caps)
     gst_caps_unref (item->caps);
 }
 
 static void
-gst_rtsp_stream_init (GstRTSPStream *stream)
+gst_rtsp_stream_init (GstRTSPStream * stream)
 {
   stream->last_ret = GST_FLOW_NOT_LINKED;
   stream->added = FALSE;
@@ -2431,7 +2431,7 @@ gst_rtsp_stream_init (GstRTSPStream *stream)
 }
 
 static GstRTSPStream *
-gst_rtspsrc_create_stream (GstRTSPSrc *src, GstSDPMessage *sdp, gint idx,
+gst_rtspsrc_create_stream (GstRTSPSrc * src, GstSDPMessage * sdp, gint idx,
     gint n_streams)
 {
   GstRTSPStream *stream;
@@ -2527,7 +2527,7 @@ gst_rtspsrc_create_stream (GstRTSPSrc *src, GstSDPMessage *sdp, gint idx,
 }
 
 static GstCaps *
-stream_get_caps_for_pt (GstRTSPStream *stream, guint pt)
+stream_get_caps_for_pt (GstRTSPStream * stream, guint pt)
 {
   guint i, len;
 
@@ -2550,7 +2550,7 @@ typedef GstRTSPSrcForeachStreamReturn (*GstRTSPSrcForeachStream) (GstRTSPSrc *,
     GstRTSPStream *, gpointer);
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_foreach_stream (GstRTSPSrc *src, GstRTSPSrcForeachStream func,
+gst_rtspsrc_foreach_stream (GstRTSPSrc * src, GstRTSPSrcForeachStream func,
     gpointer user_data)
 {
   GstIterator *it;
@@ -2593,47 +2593,47 @@ gst_rtspsrc_foreach_stream (GstRTSPSrc *src, GstRTSPSrcForeachStream func,
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_release (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_release (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer user_data)
 {
   gint i;
-  GST_DEBUG_OBJECT(src, "free stream %" GST_PTR_FORMAT, stream);
+  GST_DEBUG_OBJECT (src, "free stream %" GST_PTR_FORMAT, stream);
   for (i = 0; i < 2; i++) {
     if (stream->udpsrc[i]) {
-      gst_element_set_state(stream->udpsrc[i], GST_STATE_NULL);
-      if (gst_object_has_as_parent(GST_OBJECT(stream->udpsrc[i]),
-        GST_OBJECT(src)))
-        gst_bin_remove(GST_BIN_CAST(src), stream->udpsrc[i]);
-      gst_object_unref(stream->udpsrc[i]);
+      gst_element_set_state (stream->udpsrc[i], GST_STATE_NULL);
+      if (gst_object_has_as_parent (GST_OBJECT (stream->udpsrc[i]),
+              GST_OBJECT (src)))
+        gst_bin_remove (GST_BIN_CAST (src), stream->udpsrc[i]);
+      gst_object_unref (stream->udpsrc[i]);
     }
     if (stream->channelpad[i])
-      gst_object_unref(stream->channelpad[i]);
+      gst_object_unref (stream->channelpad[i]);
 
     if (stream->udpsink[i]) {
-      gst_element_set_state(stream->udpsink[i], GST_STATE_NULL);
-      if (gst_object_has_as_parent(GST_OBJECT(stream->udpsink[i]),
-        GST_OBJECT(src)))
-        gst_bin_remove(GST_BIN_CAST(src), stream->udpsink[i]);
-      gst_object_unref(stream->udpsink[i]);
+      gst_element_set_state (stream->udpsink[i], GST_STATE_NULL);
+      if (gst_object_has_as_parent (GST_OBJECT (stream->udpsink[i]),
+              GST_OBJECT (src)))
+        gst_bin_remove (GST_BIN_CAST (src), stream->udpsink[i]);
+      gst_object_unref (stream->udpsink[i]);
     }
   }
   if (stream->rtpsrc) {
-    gst_element_set_state(stream->rtpsrc, GST_STATE_NULL);
-    gst_bin_remove(GST_BIN_CAST(src), stream->rtpsrc);
-    gst_object_unref(stream->rtpsrc);
+    gst_element_set_state (stream->rtpsrc, GST_STATE_NULL);
+    gst_bin_remove (GST_BIN_CAST (src), stream->rtpsrc);
+    gst_object_unref (stream->rtpsrc);
   }
   if (stream->srcpad) {
-    gst_pad_set_active(stream->srcpad, FALSE);
+    gst_pad_set_active (stream->srcpad, FALSE);
     if (stream->added)
-      gst_element_remove_pad(GST_ELEMENT_CAST(src), stream->srcpad);
+      gst_element_remove_pad (GST_ELEMENT_CAST (src), stream->srcpad);
   }
 
-  gst_object_unparent(GST_OBJECT(stream));
+  gst_object_unparent (GST_OBJECT (stream));
   return GST_RTSPSRC_FOREACH_STREAM_CONTINUE;
 }
 
 static void
-gst_rtspsrc_cleanup (GstRTSPSrc *src)
+gst_rtspsrc_cleanup (GstRTSPSrc * src)
 {
   ParameterRequest *req;
 
@@ -2693,14 +2693,14 @@ gst_rtspsrc_cleanup (GstRTSPSrc *src)
 }
 
 static GstRTSPSrc *
-gst_rtspsrc_stream_get_rtspsrc (GstRTSPStream *stream)
+gst_rtspsrc_stream_get_rtspsrc (GstRTSPStream * stream)
 {
   return GST_RTSPSRC (gst_object_get_parent (GST_OBJECT (stream)));
 }
 
 static gboolean
-gst_rtspsrc_alloc_udp_ports (GstRTSPStream *stream,
-    gint *rtpport, gint *rtcpport)
+gst_rtspsrc_alloc_udp_ports (GstRTSPStream * stream,
+    gint * rtpport, gint * rtcpport)
 {
   GstRTSPSrc *src;
   GstStateChangeReturn ret;
@@ -2883,7 +2883,7 @@ cleanup:
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_set_stream_state (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_set_stream_state (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   GstState state = (GstState) data;
@@ -2899,7 +2899,7 @@ gst_rtspsrc_set_stream_state (GstRTSPSrc *src, GstRTSPStream *stream,
 
 
 static void
-gst_rtspsrc_set_state (GstRTSPSrc *src, GstState state)
+gst_rtspsrc_set_state (GstRTSPSrc * src, GstState state)
 {
   if (src->manager)
     gst_element_set_state (GST_ELEMENT_CAST (src->manager), state);
@@ -2909,7 +2909,7 @@ gst_rtspsrc_set_state (GstRTSPSrc *src, GstState state)
 }
 
 static void
-gst_rtspsrc_flush (GstRTSPSrc *src, gboolean flush, gboolean playing)
+gst_rtspsrc_flush (GstRTSPSrc * src, gboolean flush, gboolean playing)
 {
   GstEvent *event;
   gint cmd;
@@ -2935,8 +2935,8 @@ gst_rtspsrc_flush (GstRTSPSrc *src, gboolean flush, gboolean playing)
 }
 
 static GstRTSPResult
-gst_rtspsrc_connection_send (GstRTSPSrc *src, GstRTSPConnInfo *conninfo,
-    GstRTSPMessage *message, gint64 timeout)
+gst_rtspsrc_connection_send (GstRTSPSrc * src, GstRTSPConnInfo * conninfo,
+    GstRTSPMessage * message, gint64 timeout)
 {
   GstRTSPResult ret;
 
@@ -2953,8 +2953,8 @@ gst_rtspsrc_connection_send (GstRTSPSrc *src, GstRTSPConnInfo *conninfo,
 }
 
 static GstRTSPResult
-gst_rtspsrc_connection_receive (GstRTSPSrc *src, GstRTSPConnInfo *conninfo,
-    GstRTSPMessage *message, gint64 timeout)
+gst_rtspsrc_connection_receive (GstRTSPSrc * src, GstRTSPConnInfo * conninfo,
+    GstRTSPMessage * message, gint64 timeout)
 {
   GstRTSPResult ret;
 
@@ -2971,7 +2971,7 @@ gst_rtspsrc_connection_receive (GstRTSPSrc *src, GstRTSPConnInfo *conninfo,
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_position (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_position (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   GstFormat fmt;
@@ -2993,7 +2993,7 @@ gst_rtspsrc_stream_position (GstRTSPSrc *src, GstRTSPStream *stream,
 }
 
 static void
-gst_rtspsrc_get_position (GstRTSPSrc *src)
+gst_rtspsrc_get_position (GstRTSPSrc * src)
 {
   GstQuery *query;
 
@@ -3007,7 +3007,7 @@ gst_rtspsrc_get_position (GstRTSPSrc *src)
 }
 
 static void
-gst_rtspsrc_mark_discount (GstRTSPSrc *src)
+gst_rtspsrc_mark_discount (GstRTSPSrc * src)
 {
   GList *walk;
 
@@ -3020,7 +3020,7 @@ gst_rtspsrc_mark_discount (GstRTSPSrc *src)
 }
 
 static gboolean
-gst_rtspsrc_perform_seek (GstRTSPSrc *src, GstEvent *event)
+gst_rtspsrc_perform_seek (GstRTSPSrc * src, GstEvent * event)
 {
   gdouble rate;
   GstFormat format;
@@ -3195,7 +3195,8 @@ invalid_segment_flag:
 }
 
 static gboolean
-gst_rtspsrc_handle_src_event (GstPad *pad, GstObject *parent, GstEvent *event)
+gst_rtspsrc_handle_src_event (GstPad * pad, GstObject * parent,
+    GstEvent * event)
 {
   GstRTSPSrc *src;
   gboolean res = TRUE;
@@ -3243,7 +3244,7 @@ gst_rtspsrc_handle_src_event (GstPad *pad, GstObject *parent, GstEvent *event)
 }
 
 static void
-gst_rtspsrc_stream_start_event_add_group_id (GstRTSPSrc *src, GstEvent *event)
+gst_rtspsrc_stream_start_event_add_group_id (GstRTSPSrc * src, GstEvent * event)
 {
   g_mutex_lock (&src->group_lock);
 
@@ -3256,8 +3257,8 @@ gst_rtspsrc_stream_start_event_add_group_id (GstRTSPSrc *src, GstEvent *event)
 }
 
 static GstEvent *
-gst_rtspsrc_update_src_event (GstRTSPSrc *self, GstRTSPStream *stream,
-    GstEvent *event)
+gst_rtspsrc_update_src_event (GstRTSPSrc * self, GstRTSPStream * stream,
+    GstEvent * event)
 {
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_STREAM_START:{
@@ -3292,8 +3293,8 @@ gst_rtspsrc_update_src_event (GstRTSPSrc *self, GstRTSPStream *stream,
 }
 
 static gboolean
-gst_rtspsrc_handle_src_sink_event (GstPad *pad, GstObject *parent,
-    GstEvent *event)
+gst_rtspsrc_handle_src_sink_event (GstPad * pad, GstObject * parent,
+    GstEvent * event)
 {
   GstRTSPStream *stream;
   GstRTSPSrc *src;
@@ -3310,8 +3311,8 @@ gst_rtspsrc_handle_src_sink_event (GstPad *pad, GstObject *parent,
 /* this is the final event function we receive on the internal source pad when
  * we deal with TCP connections */
 static gboolean
-gst_rtspsrc_handle_internal_src_event (GstPad *pad, GstObject *parent,
-    GstEvent *event)
+gst_rtspsrc_handle_internal_src_event (GstPad * pad, GstObject * parent,
+    GstEvent * event)
 {
   gboolean res;
 
@@ -3333,8 +3334,8 @@ gst_rtspsrc_handle_internal_src_event (GstPad *pad, GstObject *parent,
 /* this is the final query function we receive on the internal source pad when
  * we deal with TCP connections */
 static gboolean
-gst_rtspsrc_handle_internal_src_query (GstPad *pad, GstObject *parent,
-    GstQuery *query)
+gst_rtspsrc_handle_internal_src_query (GstPad * pad, GstObject * parent,
+    GstQuery * query)
 {
   GstRTSPSrc *src;
   gboolean res = FALSE;
@@ -3383,7 +3384,8 @@ gst_rtspsrc_handle_internal_src_query (GstPad *pad, GstObject *parent,
 
 /* this query is executed on the ghost source pad exposed on rtspsrc. */
 static gboolean
-gst_rtspsrc_handle_src_query (GstPad *pad, GstObject *parent, GstQuery *query)
+gst_rtspsrc_handle_src_query (GstPad * pad, GstObject * parent,
+    GstQuery * query)
 {
   GstRTSPSrc *src;
   gboolean res = FALSE;
@@ -3474,7 +3476,7 @@ gst_rtspsrc_handle_src_query (GstPad *pad, GstObject *parent, GstQuery *query)
 /* callback for RTCP messages to be sent to the server when operating in TCP
  * mode. */
 static GstFlowReturn
-gst_rtspsrc_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buffer)
+gst_rtspsrc_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
 {
   GstRTSPSrc *src;
   GstRTSPStream *stream;
@@ -3509,8 +3511,8 @@ gst_rtspsrc_sink_chain (GstPad *pad, GstObject *parent, GstBuffer *buffer)
 }
 
 static GstFlowReturn
-gst_rtspsrc_push_backchannel_buffer (GstRTSPSrc *src, guint id,
-    GstSample *sample)
+gst_rtspsrc_push_backchannel_buffer (GstRTSPSrc * src, guint id,
+    GstSample * sample)
 {
   GstFlowReturn res;
 
@@ -3522,8 +3524,8 @@ gst_rtspsrc_push_backchannel_buffer (GstRTSPSrc *src, guint id,
 }
 
 static GstFlowReturn
-gst_rtspsrc_push_backchannel_sample (GstRTSPSrc *src, guint id,
-    GstSample *sample)
+gst_rtspsrc_push_backchannel_sample (GstRTSPSrc * src, guint id,
+    GstSample * sample)
 {
   GstFlowReturn res = GST_FLOW_OK;
   GstRTSPStream *stream = NULL;
@@ -3578,7 +3580,7 @@ out:
 }
 
 static GstPadProbeReturn
-pad_blocked (GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
+pad_blocked (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 {
   GstRTSPSrc *src = user_data;
 
@@ -3605,7 +3607,7 @@ was_ok:
 }
 
 static GstPadProbeReturn
-udpsrc_probe_cb (GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
+udpsrc_probe_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 {
   guint32 *segment_seqnum = user_data;
 
@@ -3627,7 +3629,7 @@ typedef struct
 } CopyStickyEventsData;
 
 static gboolean
-copy_sticky_events (GstPad *pad, GstEvent **event, gpointer user_data)
+copy_sticky_events (GstPad * pad, GstEvent ** event, gpointer user_data)
 {
   CopyStickyEventsData *data = user_data;
   GstEvent *new_event;
@@ -3644,8 +3646,8 @@ copy_sticky_events (GstPad *pad, GstEvent **event, gpointer user_data)
 }
 
 static gboolean
-add_backchannel_fakesink (GstRTSPSrc *src, GstRTSPStream *stream,
-    GstPad *srcpad)
+add_backchannel_fakesink (GstRTSPSrc * src, GstRTSPStream * stream,
+    GstPad * srcpad)
 {
   GstPad *sinkpad;
   GstElement *fakesink;
@@ -3675,7 +3677,7 @@ add_backchannel_fakesink (GstRTSPSrc *src, GstRTSPStream *stream,
 /* this callback is called when the session manager generated a new src pad with
  * payloaded RTP packets. We simply ghost the pad here. */
 static void
-new_manager_pad (GstElement *manager, GstPad *pad, GstRTSPSrc *src)
+new_manager_pad (GstElement * manager, GstPad * pad, GstRTSPSrc * src)
 {
   gchar *name;
   GstPadTemplate *template;
@@ -3778,7 +3780,7 @@ unknown_stream:
 }
 
 static GstCaps *
-request_pt_map (GstElement *manager, guint session, guint pt, GstRTSPSrc *src)
+request_pt_map (GstElement * manager, guint session, guint pt, GstRTSPSrc * src)
 {
   GstRTSPStream *stream;
   GstCaps *caps;
@@ -3814,7 +3816,7 @@ typedef struct
 } GstRTSPSrcPushEvent;
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_push_event (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_push_event (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   GstRTSPSrcPushEvent *push_data = (GstRTSPSrcPushEvent *) data;
@@ -3892,7 +3894,7 @@ gst_rtspsrc_stream_push_event (GstRTSPSrc *src, GstRTSPStream *stream,
 }
 
 static void
-gst_rtspsrc_do_stream_eos (GstRTSPSrc *src, GstRTSPStream *stream)
+gst_rtspsrc_do_stream_eos (GstRTSPSrc * src, GstRTSPStream * stream)
 {
   GstRTSPSrcPushEvent push_data = { gst_event_new_eos (), FALSE };
   GST_DEBUG_OBJECT (src, "setting stream for session %u to EOS", stream->id);
@@ -3902,7 +3904,7 @@ gst_rtspsrc_do_stream_eos (GstRTSPSrc *src, GstRTSPStream *stream)
 }
 
 static void
-on_bye_ssrc (GObject *session, GObject *source, GstRTSPStream *stream)
+on_bye_ssrc (GObject * session, GObject * source, GstRTSPStream * stream)
 {
   GstRTSPSrc *src = gst_rtspsrc_stream_get_rtspsrc (stream);
   guint ssrc;
@@ -3919,7 +3921,7 @@ on_bye_ssrc (GObject *session, GObject *source, GstRTSPStream *stream)
 }
 
 static void
-on_timeout_common (GObject *session, GObject *source, GstRTSPStream *stream)
+on_timeout_common (GObject * session, GObject * source, GstRTSPStream * stream)
 {
   GstRTSPSrc *src = gst_rtspsrc_stream_get_rtspsrc (stream);
   guint ssrc;
@@ -3969,7 +3971,7 @@ on_timeout_common (GObject *session, GObject *source, GstRTSPStream *stream)
 }
 
 static void
-on_timeout (GObject *session, GObject *source, GstRTSPStream *stream)
+on_timeout (GObject * session, GObject * source, GstRTSPStream * stream)
 {
   GstRTSPSrc *src = gst_rtspsrc_stream_get_rtspsrc (stream);
 
@@ -3990,7 +3992,7 @@ on_timeout (GObject *session, GObject *source, GstRTSPStream *stream)
 }
 
 static void
-on_npt_stop (GstElement *rtpbin, guint session, guint ssrc, GstRTSPSrc *src)
+on_npt_stop (GstElement * rtpbin, guint session, guint ssrc, GstRTSPSrc * src)
 {
   GstRTSPStream *stream;
 
@@ -4007,7 +4009,7 @@ on_npt_stop (GstElement *rtpbin, guint session, guint ssrc, GstRTSPSrc *src)
 }
 
 static void
-on_ssrc_active (GObject *session, GObject *source, GstRTSPStream *stream)
+on_ssrc_active (GObject * session, GObject * source, GstRTSPStream * stream)
 {
   GST_DEBUG_OBJECT (stream, "source is active");
 
@@ -4015,7 +4017,7 @@ on_ssrc_active (GObject *session, GObject *source, GstRTSPStream *stream)
 }
 
 static void
-set_manager_buffer_mode (GstRTSPSrc *src)
+set_manager_buffer_mode (GstRTSPSrc * src)
 {
   GObjectClass *klass;
 
@@ -4065,7 +4067,7 @@ set_manager_buffer_mode (GstRTSPSrc *src)
 }
 
 static GstCaps *
-request_key (GstElement *srtpdec, guint ssrc, GstRTSPStream *stream)
+request_key (GstElement * srtpdec, guint ssrc, GstRTSPStream * stream)
 {
   guint i;
   GstCaps *caps;
@@ -4091,7 +4093,7 @@ request_key (GstElement *srtpdec, guint ssrc, GstRTSPStream *stream)
 }
 
 static GstElement *
-request_rtp_decoder (GstElement *rtpbin, guint session, GstRTSPStream *stream)
+request_rtp_decoder (GstElement * rtpbin, guint session, GstRTSPStream * stream)
 {
   GST_DEBUG ("decoder session %u, stream %p, %d", session, stream, stream->id);
   if (stream->id != session)
@@ -4122,7 +4124,8 @@ request_rtp_decoder (GstElement *rtpbin, guint session, GstRTSPStream *stream)
 }
 
 static GstElement *
-request_rtcp_encoder (GstElement *rtpbin, guint session, GstRTSPStream *stream)
+request_rtcp_encoder (GstElement * rtpbin, guint session,
+    GstRTSPStream * stream)
 {
   gchar *name;
   GstPad *pad;
@@ -4193,7 +4196,7 @@ request_rtcp_encoder (GstElement *rtpbin, guint session, GstRTSPStream *stream)
 }
 
 static GstElement *
-request_aux_receiver (GstElement *rtpbin, guint sessid, GstRTSPSrc *src)
+request_aux_receiver (GstElement * rtpbin, guint sessid, GstRTSPSrc * src)
 {
   GstElement *rtx, *bin;
   GstPad *pad;
@@ -4231,7 +4234,7 @@ request_aux_receiver (GstElement *rtpbin, guint sessid, GstRTSPSrc *src)
 }
 
 static void
-add_retransmission (GstRTSPSrc *src, GstRTSPTransport *transport)
+add_retransmission (GstRTSPSrc * src, GstRTSPTransport * transport)
 {
   GList *walk;
   guint signal_id;
@@ -4318,8 +4321,8 @@ add_retransmission (GstRTSPSrc *src, GstRTSPTransport *transport)
 
 /* try to get and configure a manager */
 static gboolean
-gst_rtspsrc_stream_configure_manager (GstRTSPSrc *src, GstRTSPStream *stream,
-    GstRTSPTransport *transport)
+gst_rtspsrc_stream_configure_manager (GstRTSPSrc * src, GstRTSPStream * stream,
+    GstRTSPTransport * transport)
 {
   const gchar *manager;
   gchar *name;
@@ -4560,7 +4563,7 @@ start_manager_failure:
  * This function is called when the server negotiated to a transport where the
  * UDP sources are not needed anymore, such as TCP or multicast. */
 static void
-gst_rtspsrc_stream_free_udp (GstRTSPStream *stream)
+gst_rtspsrc_stream_free_udp (GstRTSPStream * stream)
 {
   gint i;
 
@@ -4578,8 +4581,8 @@ gst_rtspsrc_stream_free_udp (GstRTSPStream *stream)
  * intercept various events and queries
  */
 static gboolean
-gst_rtspsrc_stream_configure_tcp (GstRTSPSrc *src, GstRTSPStream *stream,
-    GstRTSPTransport *transport, GstPad **outpad)
+gst_rtspsrc_stream_configure_tcp (GstRTSPSrc * src, GstRTSPStream * stream,
+    GstRTSPTransport * transport, GstPad ** outpad)
 {
   gchar *name;
   GstPadTemplate *template;
@@ -4668,9 +4671,9 @@ gst_rtspsrc_stream_configure_tcp (GstRTSPSrc *src, GstRTSPStream *stream,
 }
 
 static void
-gst_rtspsrc_get_transport_info (GstRTSPSrc *src, GstRTSPStream *stream,
-    GstRTSPTransport *transport, const gchar **destination, gint *min,
-    gint *max, guint *ttl)
+gst_rtspsrc_get_transport_info (GstRTSPSrc * src, GstRTSPStream * stream,
+    GstRTSPTransport * transport, const gchar ** destination, gint * min,
+    gint * max, guint * ttl)
 {
   if (transport->lower_transport == GST_RTSP_LOWER_TRANS_UDP_MCAST) {
     if (destination) {
@@ -4716,7 +4719,7 @@ gst_rtspsrc_get_transport_info (GstRTSPSrc *src, GstRTSPStream *stream,
 
 static GstElement *
 element_make_from_addr (const GstURIType type, const char *addr_s,
-    int port, const char *name, GError **error)
+    int port, const char *name, GError ** error)
 {
   GInetAddress *addr;
   GstElement *element = NULL;
@@ -4752,8 +4755,8 @@ out:
 
 /* For multicast create UDP sources and join the multicast group. */
 static gboolean
-gst_rtspsrc_stream_configure_mcast (GstRTSPSrc *src, GstRTSPStream *stream,
-    GstRTSPTransport *transport, GstPad **outpad)
+gst_rtspsrc_stream_configure_mcast (GstRTSPSrc * src, GstRTSPStream * stream,
+    GstRTSPTransport * transport, GstPad ** outpad)
 {
   const gchar *destination;
   gint min, max;
@@ -4848,8 +4851,8 @@ no_ports:
 
 /* configure the remainder of the UDP ports */
 static gboolean
-gst_rtspsrc_stream_configure_udp (GstRTSPSrc *src, GstRTSPStream *stream,
-    GstRTSPTransport *transport, GstPad **outpad)
+gst_rtspsrc_stream_configure_udp (GstRTSPSrc * src, GstRTSPStream * stream,
+    GstRTSPTransport * transport, GstPad ** outpad)
 {
   /* we manage the UDP elements now. For unicast, the UDP sources where
    * allocated in the stream when we suggested a transport. */
@@ -4938,8 +4941,8 @@ gst_rtspsrc_stream_configure_udp (GstRTSPSrc *src, GstRTSPStream *stream,
 
 /* configure the UDP sink back to the server for status reports */
 static gboolean
-gst_rtspsrc_stream_configure_udp_sinks (GstRTSPSrc *src,
-    GstRTSPStream *stream, GstRTSPTransport *transport)
+gst_rtspsrc_stream_configure_udp_sinks (GstRTSPSrc * src,
+    GstRTSPStream * stream, GstRTSPTransport * transport)
 {
   GstPad *pad;
   gint rtp_port, rtcp_port;
@@ -5117,8 +5120,8 @@ no_socket:
  * firewall, for example.
  */
 static gboolean
-gst_rtspsrc_stream_configure_transport (GstRTSPStream *stream,
-    GstRTSPTransport *transport)
+gst_rtspsrc_stream_configure_transport (GstRTSPStream * stream,
+    GstRTSPTransport * transport)
 {
   GstRTSPSrc *src;
   GstPad *outpad = NULL;
@@ -5242,7 +5245,7 @@ no_manager:
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_send_dummy_packets (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_send_dummy_packets (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   if (!stream->rtpsrc || !stream->udpsink[0])
@@ -5267,7 +5270,7 @@ gst_rtspsrc_stream_send_dummy_packets (GstRTSPSrc *src, GstRTSPStream *stream,
  * this should make a firewall think we initiated the data transfer and
  * hopefully allow packets to go from the sender port to our RTP receiver port */
 static gboolean
-gst_rtspsrc_send_dummy_packets (GstRTSPSrc *src)
+gst_rtspsrc_send_dummy_packets (GstRTSPSrc * src)
 {
   if (src->nat_method != GST_RTSP_NAT_DUMMY)
     return TRUE;
@@ -5277,7 +5280,7 @@ gst_rtspsrc_send_dummy_packets (GstRTSPSrc *src)
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_activate (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_activate (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   if (stream->udpsrc[0]) {
@@ -5320,7 +5323,7 @@ gst_rtspsrc_stream_activate (GstRTSPSrc *src, GstRTSPStream *stream,
  * udp sources.
  */
 static gboolean
-gst_rtspsrc_activate_streams (GstRTSPSrc *src)
+gst_rtspsrc_activate_streams (GstRTSPSrc * src)
 {
   GList *walk;
 
@@ -5346,7 +5349,7 @@ gst_rtspsrc_activate_streams (GstRTSPSrc *src)
 }
 
 static void
-gst_rtspsrc_configure_caps (GstRTSPSrc *src, GstSegment *segment,
+gst_rtspsrc_configure_caps (GstRTSPSrc * src, GstSegment * segment,
     gboolean reset_manager)
 {
   GList *walk;
@@ -5411,7 +5414,7 @@ gst_rtspsrc_configure_caps (GstRTSPSrc *src, GstSegment *segment,
 }
 
 static GstFlowReturn
-gst_rtspsrc_combine_flows (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_combine_flows (GstRTSPSrc * src, GstRTSPStream * stream,
     GstFlowReturn ret)
 {
   GList *streams;
@@ -5447,7 +5450,7 @@ done:
 }
 
 static gboolean
-gst_rtspsrc_push_event (GstRTSPSrc *src, GstEvent *event)
+gst_rtspsrc_push_event (GstRTSPSrc * src, GstEvent * event)
 {
   GstRTSPSrcPushEvent push_data = { event, TRUE };
 
@@ -5458,7 +5461,7 @@ gst_rtspsrc_push_event (GstRTSPSrc *src, GstEvent *event)
 }
 
 static gboolean
-accept_certificate_cb (GTlsConnection *conn, GTlsCertificate *peer_cert,
+accept_certificate_cb (GTlsConnection * conn, GTlsCertificate * peer_cert,
     GTlsCertificateFlags errors, gpointer user_data)
 {
   GstRTSPSrc *src = user_data;
@@ -5471,7 +5474,7 @@ accept_certificate_cb (GTlsConnection *conn, GTlsCertificate *peer_cert,
 }
 
 static GstRTSPResult
-gst_rtsp_conninfo_connect (GstRTSPSrc *src, GstRTSPConnInfo *info,
+gst_rtsp_conninfo_connect (GstRTSPSrc * src, GstRTSPConnInfo * info,
     gboolean async)
 {
   GstRTSPResult res;
@@ -5586,7 +5589,8 @@ could_not_connect:
 }
 
 static GstRTSPResult
-gst_rtsp_conninfo_close (GstRTSPSrc *src, GstRTSPConnInfo *info, gboolean free)
+gst_rtsp_conninfo_close (GstRTSPSrc * src, GstRTSPConnInfo * info,
+    gboolean free)
 {
   GST_RTSP_STATE_LOCK (src);
   if (info->connected) {
@@ -5606,7 +5610,7 @@ gst_rtsp_conninfo_close (GstRTSPSrc *src, GstRTSPConnInfo *info, gboolean free)
 }
 
 static GstRTSPResult
-gst_rtsp_conninfo_reconnect (GstRTSPSrc *src, GstRTSPConnInfo *info,
+gst_rtsp_conninfo_reconnect (GstRTSPSrc * src, GstRTSPConnInfo * info,
     gboolean async)
 {
   GstRTSPResult res;
@@ -5619,7 +5623,7 @@ gst_rtsp_conninfo_reconnect (GstRTSPSrc *src, GstRTSPConnInfo *info,
 }
 
 static void
-gst_rtspsrc_connection_flush (GstRTSPSrc *src, gboolean flush)
+gst_rtspsrc_connection_flush (GstRTSPSrc * src, gboolean flush)
 {
   GList *walk;
 
@@ -5644,8 +5648,8 @@ gst_rtspsrc_connection_flush (GstRTSPSrc *src, gboolean flush)
 }
 
 static GstRTSPResult
-gst_rtspsrc_init_request (GstRTSPSrc *src, GstRTSPMessage *msg,
-    GstRTSPMethod method, const gchar *uri)
+gst_rtspsrc_init_request (GstRTSPSrc * src, GstRTSPMessage * msg,
+    GstRTSPMethod method, const gchar * uri)
 {
   GstRTSPResult res;
 
@@ -5662,8 +5666,8 @@ gst_rtspsrc_init_request (GstRTSPSrc *src, GstRTSPMessage *msg,
 
 /* FIXME, handle server request, reply with OK, for now */
 static GstRTSPResult
-gst_rtspsrc_handle_request (GstRTSPSrc *src, GstRTSPConnInfo *conninfo,
-    GstRTSPMessage *request)
+gst_rtspsrc_handle_request (GstRTSPSrc * src, GstRTSPConnInfo * conninfo,
+    GstRTSPMessage * request)
 {
   GstRTSPMessage response = { 0 };
   GstRTSPResult res;
@@ -5709,7 +5713,7 @@ send_error:
 
 /* send server keep-alive */
 static GstRTSPResult
-gst_rtspsrc_send_keep_alive (GstRTSPSrc *src)
+gst_rtspsrc_send_keep_alive (GstRTSPSrc * src)
 {
   GstRTSPMessage request = { 0 };
   GstRTSPResult res;
@@ -5768,7 +5772,7 @@ send_error:
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_pre_activate (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_pre_activate (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   GstRTSPStream *ostream = stream;
@@ -5835,7 +5839,7 @@ gst_rtspsrc_stream_pre_activate (GstRTSPSrc *src, GstRTSPStream *stream,
 }
 
 static GstFlowReturn
-gst_rtspsrc_handle_data (GstRTSPSrc *src, GstRTSPMessage *message)
+gst_rtspsrc_handle_data (GstRTSPSrc * src, GstRTSPMessage * message)
 {
   GstFlowReturn ret = GST_FLOW_OK;
   gint channel;
@@ -6019,7 +6023,7 @@ invalid_length:
 }
 
 static GstFlowReturn
-gst_rtspsrc_loop_interleaved (GstRTSPSrc *src)
+gst_rtspsrc_loop_interleaved (GstRTSPSrc * src)
 {
   GstRTSPMessage message = { 0 };
   GstRTSPResult res;
@@ -6131,7 +6135,7 @@ handle_data_failed:
 }
 
 static GstFlowReturn
-gst_rtspsrc_loop_udp (GstRTSPSrc *src)
+gst_rtspsrc_loop_udp (GstRTSPSrc * src)
 {
   GstRTSPResult res;
   GstRTSPMessage message = { 0 };
@@ -6289,7 +6293,7 @@ server_eof:
 }
 
 static GstRTSPResult
-gst_rtspsrc_reconnect (GstRTSPSrc *src, gboolean async)
+gst_rtspsrc_reconnect (GstRTSPSrc * src, gboolean async)
 {
   GstRTSPResult res = GST_RTSP_OK;
   gboolean restart;
@@ -6360,7 +6364,7 @@ play_failed:
 }
 
 static void
-gst_rtspsrc_loop_start_cmd (GstRTSPSrc *src, gint cmd)
+gst_rtspsrc_loop_start_cmd (GstRTSPSrc * src, gint cmd)
 {
   switch (cmd) {
     case CMD_OPEN:
@@ -6389,7 +6393,7 @@ gst_rtspsrc_loop_start_cmd (GstRTSPSrc *src, gint cmd)
 }
 
 static void
-gst_rtspsrc_loop_complete_cmd (GstRTSPSrc *src, gint cmd)
+gst_rtspsrc_loop_complete_cmd (GstRTSPSrc * src, gint cmd)
 {
   switch (cmd) {
     case CMD_OPEN:
@@ -6418,7 +6422,7 @@ gst_rtspsrc_loop_complete_cmd (GstRTSPSrc *src, gint cmd)
 }
 
 static void
-gst_rtspsrc_loop_cancel_cmd (GstRTSPSrc *src, gint cmd)
+gst_rtspsrc_loop_cancel_cmd (GstRTSPSrc * src, gint cmd)
 {
   switch (cmd) {
     case CMD_OPEN:
@@ -6447,7 +6451,7 @@ gst_rtspsrc_loop_cancel_cmd (GstRTSPSrc *src, gint cmd)
 }
 
 static void
-gst_rtspsrc_loop_error_cmd (GstRTSPSrc *src, gint cmd)
+gst_rtspsrc_loop_error_cmd (GstRTSPSrc * src, gint cmd)
 {
   switch (cmd) {
     case CMD_OPEN:
@@ -6474,7 +6478,7 @@ gst_rtspsrc_loop_error_cmd (GstRTSPSrc *src, gint cmd)
 }
 
 static void
-gst_rtspsrc_loop_end_cmd (GstRTSPSrc *src, gint cmd, GstRTSPResult ret)
+gst_rtspsrc_loop_end_cmd (GstRTSPSrc * src, gint cmd, GstRTSPResult ret)
 {
   if (ret == GST_RTSP_OK)
     gst_rtspsrc_loop_complete_cmd (src, cmd);
@@ -6485,7 +6489,7 @@ gst_rtspsrc_loop_end_cmd (GstRTSPSrc *src, gint cmd, GstRTSPResult ret)
 }
 
 static gboolean
-gst_rtspsrc_loop_send_cmd (GstRTSPSrc *src, gint cmd, gint mask)
+gst_rtspsrc_loop_send_cmd (GstRTSPSrc * src, gint cmd, gint mask)
 {
   gint old;
   gboolean flushed = FALSE;
@@ -6541,7 +6545,7 @@ gst_rtspsrc_loop_send_cmd (GstRTSPSrc *src, gint cmd, gint mask)
 }
 
 static gboolean
-gst_rtspsrc_loop_send_cmd_and_wait (GstRTSPSrc *src, gint cmd, gint mask,
+gst_rtspsrc_loop_send_cmd_and_wait (GstRTSPSrc * src, gint cmd, gint mask,
     GstClockTime timeout)
 {
   gboolean flushed = gst_rtspsrc_loop_send_cmd (src, cmd, mask);
@@ -6563,7 +6567,7 @@ gst_rtspsrc_loop_send_cmd_and_wait (GstRTSPSrc *src, gint cmd, gint mask,
 }
 
 static gboolean
-gst_rtspsrc_loop (GstRTSPSrc *src)
+gst_rtspsrc_loop (GstRTSPSrc * src)
 {
   GstFlowReturn ret;
 
@@ -6648,8 +6652,8 @@ gst_rtsp_auth_method_to_string (GstRTSPAuthMethod method)
  * At the moment, for Basic auth, we just do a minimal check and don't
  * even parse out the realm */
 static gboolean
-gst_rtspsrc_parse_auth_hdr (GstRTSPMessage *response,
-    GstRTSPAuthMethod *methods, GstRTSPConnection *conn, gboolean *stale)
+gst_rtspsrc_parse_auth_hdr (GstRTSPMessage * response,
+    GstRTSPAuthMethod * methods, GstRTSPConnection * conn, gboolean * stale)
 {
   GstRTSPAuthCredential **credentials, **credential;
 
@@ -6708,7 +6712,7 @@ gst_rtspsrc_parse_auth_hdr (GstRTSPMessage *response,
  * Returns: TRUE if authentication information could be set up correctly.
  */
 static gboolean
-gst_rtspsrc_setup_auth (GstRTSPSrc *src, GstRTSPMessage *response)
+gst_rtspsrc_setup_auth (GstRTSPSrc * src, GstRTSPMessage * response)
 {
   gchar *user = NULL;
   gchar *pass = NULL;
@@ -6804,8 +6808,8 @@ propagate_error:
 }
 
 static GstRTSPResult
-gst_rtsp_src_receive_response (GstRTSPSrc *src, GstRTSPConnInfo *conninfo,
-    GstRTSPMessage *response, GstRTSPStatusCode *code)
+gst_rtsp_src_receive_response (GstRTSPSrc * src, GstRTSPConnInfo * conninfo,
+    GstRTSPMessage * response, GstRTSPStatusCode * code)
 {
   GstRTSPStatusCode thecode;
   gchar *content_base = NULL;
@@ -6927,8 +6931,9 @@ server_eof:
 
 
 static GstRTSPResult
-gst_rtspsrc_try_send (GstRTSPSrc *src, GstRTSPConnInfo *conninfo,
-    GstRTSPMessage *request, GstRTSPMessage *response, GstRTSPStatusCode *code)
+gst_rtspsrc_try_send (GstRTSPSrc * src, GstRTSPConnInfo * conninfo,
+    GstRTSPMessage * request, GstRTSPMessage * response,
+    GstRTSPStatusCode * code)
 {
   GstRTSPResult res;
   gint try = 0;
@@ -7033,9 +7038,9 @@ receive_error:
  * Returns: #GST_RTSP_OK if the processing was successful.
  */
 static GstRTSPResult
-gst_rtspsrc_send (GstRTSPSrc *src, GstRTSPConnInfo *conninfo,
-    GstRTSPMessage *request, GstRTSPMessage *response,
-    GstRTSPStatusCode *code, GstRTSPVersion *versions)
+gst_rtspsrc_send (GstRTSPSrc * src, GstRTSPConnInfo * conninfo,
+    GstRTSPMessage * request, GstRTSPMessage * response,
+    GstRTSPStatusCode * code, GstRTSPVersion * versions)
 {
   GstRTSPStatusCode int_code = GST_RTSP_STS_OK;
   GstRTSPResult res = GST_RTSP_ERROR;
@@ -7187,8 +7192,8 @@ error_response:
 }
 
 static GstRTSPResult
-gst_rtspsrc_send_cb (GstRTSPExtension *ext, GstRTSPMessage *request,
-    GstRTSPMessage *response, GstRTSPSrc *src)
+gst_rtspsrc_send_cb (GstRTSPExtension * ext, GstRTSPMessage * request,
+    GstRTSPMessage * response, GstRTSPSrc * src)
 {
   return gst_rtspsrc_send (src, &src->conninfo, request, response, NULL, NULL);
 }
@@ -7199,7 +7204,7 @@ gst_rtspsrc_send_cb (GstRTSPExtension *ext, GstRTSPMessage *request,
  * server.
  */
 static gboolean
-gst_rtspsrc_parse_methods (GstRTSPSrc *src, GstRTSPMessage *response)
+gst_rtspsrc_parse_methods (GstRTSPSrc * src, GstRTSPMessage * response)
 {
   GstRTSPHeaderField field;
   gchar *respoptions;
@@ -7271,8 +7276,8 @@ no_setup:
 }
 
 static GstRTSPResult
-gst_rtspsrc_create_transports_string (GstRTSPSrc *src,
-    GstRTSPLowerTrans protocols, GstRTSPProfile profile, gchar **transports)
+gst_rtspsrc_create_transports_string (GstRTSPSrc * src,
+    GstRTSPLowerTrans protocols, GstRTSPProfile profile, gchar ** transports)
 {
   GstRTSPResult res;
   GString *result;
@@ -7361,7 +7366,7 @@ no_ports:
 }
 
 static GstRTSPResult
-gst_rtspsrc_prepare_transports (GstRTSPStream *stream, gchar **transports,
+gst_rtspsrc_prepare_transports (GstRTSPStream * stream, gchar ** transports,
     gint orig_rtpport, gint orig_rtcpport)
 {
   GstRTSPSrc *src;
@@ -7443,7 +7448,7 @@ failed:
 }
 
 static GstCaps *
-signal_get_srtcp_params (GstRTSPSrc *src, GstRTSPStream *stream)
+signal_get_srtcp_params (GstRTSPSrc * src, GstRTSPStream * stream)
 {
   GstCaps *caps = NULL;
 
@@ -7486,7 +7491,7 @@ default_srtcp_params (void)
 }
 
 static gchar *
-gst_rtspsrc_stream_make_keymgmt (GstRTSPSrc *src, GstRTSPStream *stream)
+gst_rtspsrc_stream_make_keymgmt (GstRTSPSrc * src, GstRTSPStream * stream)
 {
   gchar *base64, *result = NULL;
   GstMIKEYMessage *mikey_msg;
@@ -7513,9 +7518,9 @@ gst_rtspsrc_stream_make_keymgmt (GstRTSPSrc *src, GstRTSPStream *stream)
 }
 
 static GstRTSPResult
-gst_rtsp_src_setup_stream_from_response (GstRTSPSrc *src,
-    GstRTSPStream *stream, GstRTSPMessage *response,
-    GstRTSPLowerTrans *protocols, gint retry, gint *rtpport, gint *rtcpport)
+gst_rtsp_src_setup_stream_from_response (GstRTSPSrc * src,
+    GstRTSPStream * stream, GstRTSPMessage * response,
+    GstRTSPLowerTrans * protocols, gint retry, gint * rtpport, gint * rtcpport)
 {
   gchar *resptrans = NULL;
   GstRTSPTransport transport = { 0 };
@@ -7651,7 +7656,7 @@ no_transport:
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_setup_end (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_setup_end (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   GstRTSPMessage response = { 0, };
@@ -7672,7 +7677,7 @@ gst_rtspsrc_stream_setup_end (GstRTSPSrc *src, GstRTSPStream *stream,
 
 
 static GstRTSPResult
-gst_rtspsrc_setup_streams_end (GstRTSPSrc *src, gboolean async)
+gst_rtspsrc_setup_streams_end (GstRTSPSrc * src, gboolean async)
 {
   g_assert (src->version >= GST_RTSP_VERSION_2_0);
 
@@ -7682,7 +7687,7 @@ gst_rtspsrc_setup_streams_end (GstRTSPSrc *src, gboolean async)
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_skip_if_equal (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_skip_if_equal (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   const GstRTSPStream *ostream = (GstRTSPStream *) data;
@@ -7721,7 +7726,7 @@ typedef struct
 } GstRTSPSrcSetupStart;
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_setup_start (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_setup_start (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   GstRTSPConnInfo *conninfo;
@@ -8038,7 +8043,7 @@ retry:
  * remaining streams from the RTSP thread.
  */
 static GstRTSPResult
-gst_rtspsrc_setup_streams_start (GstRTSPSrc *src, gboolean async)
+gst_rtspsrc_setup_streams_start (GstRTSPSrc * src, gboolean async)
 {
   GstRTSPUrl *url;
   GstRTSPSrcSetupStart setup_data = {
@@ -8187,8 +8192,8 @@ cleanup_error:
 }
 
 static gboolean
-gst_rtspsrc_parse_range (GstRTSPSrc *src, const gchar *range,
-    GstSegment *segment, gboolean update_duration)
+gst_rtspsrc_parse_range (GstRTSPSrc * src, const gchar * range,
+    GstSegment * segment, gboolean update_duration)
 {
   GstClockTime begin_seconds, end_seconds;
   gint64 seconds;
@@ -8281,7 +8286,7 @@ gst_rtspsrc_parse_range (GstRTSPSrc *src, const gchar *range,
  * "GstNetTimeProvider <wrapped-clock> <server-IP:port> <clock-time>"
  */
 static gboolean
-gst_rtspsrc_parse_gst_clock (GstRTSPSrc *src, const gchar *gstclock)
+gst_rtspsrc_parse_gst_clock (GstRTSPSrc * src, const gchar * gstclock)
 {
   gboolean res = FALSE;
 
@@ -8342,7 +8347,8 @@ gst_rtspsrc_parse_gst_clock (GstRTSPSrc *src, const gchar *gstclock)
 
 /* must be called with the RTSP state lock */
 static GstRTSPResult
-gst_rtspsrc_open_from_sdp (GstRTSPSrc *src, GstSDPMessage *sdp, gboolean async)
+gst_rtspsrc_open_from_sdp (GstRTSPSrc * src, GstSDPMessage * sdp,
+    gboolean async)
 {
   GstRTSPResult res;
   gint i, n_streams;
@@ -8453,7 +8459,8 @@ setup_failed:
 }
 
 static GstRTSPResult
-gst_rtspsrc_retrieve_sdp (GstRTSPSrc *src, GstSDPMessage **sdp, gboolean async)
+gst_rtspsrc_retrieve_sdp (GstRTSPSrc * src, GstSDPMessage ** sdp,
+    gboolean async)
 {
   GstRTSPResult res;
   GstRTSPMessage request = { 0 };
@@ -8665,7 +8672,7 @@ cleanup_error:
 }
 
 static GstRTSPResult
-gst_rtspsrc_open (GstRTSPSrc *src, gboolean async)
+gst_rtspsrc_open (GstRTSPSrc * src, gboolean async)
 {
   GstRTSPResult ret;
 
@@ -8726,7 +8733,8 @@ typedef struct
 } GstRTSPSrcClose;
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_close (GstRTSPSrc *src, GstRTSPStream *stream, gpointer data)
+gst_rtspsrc_stream_close (GstRTSPSrc * src, GstRTSPStream * stream,
+    gpointer data)
 {
   GstRTSPSrcClose *close_data = (GstRTSPSrcClose *) data;
   const gchar *setup_url;
@@ -8784,7 +8792,7 @@ next:
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_conninfo_close (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_conninfo_close (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   gst_rtsp_conninfo_close (src, &stream->conninfo, TRUE);
@@ -8793,7 +8801,7 @@ gst_rtspsrc_stream_conninfo_close (GstRTSPSrc *src, GstRTSPStream *stream,
 
 
 static GstRTSPResult
-gst_rtspsrc_close (GstRTSPSrc *src, gboolean async, gboolean only_close)
+gst_rtspsrc_close (GstRTSPSrc * src, gboolean async, gboolean only_close)
 {
   const gchar *control;
   GstRTSPSrcClose close_data = {.res = GST_RTSP_OK,.async = async, 0 };
@@ -8884,7 +8892,7 @@ not_supported:
  * packets that are from before the seek.
  */
 static gboolean
-gst_rtspsrc_parse_rtpinfo (GstRTSPSrc *src, gchar *rtpinfo)
+gst_rtspsrc_parse_rtpinfo (GstRTSPSrc * src, gchar * rtpinfo)
 {
   gchar **infos;
   gint i, j;
@@ -8938,7 +8946,7 @@ gst_rtspsrc_parse_rtpinfo (GstRTSPSrc *src, gchar *rtpinfo)
       /* we have a stream, configure detected params */
       stream->seqbase = seqbase;
       stream->timebase = timebase;
-      gst_object_unref(stream);
+      gst_object_unref (stream);
     }
   }
   g_strfreev (infos);
@@ -8947,7 +8955,7 @@ gst_rtspsrc_parse_rtpinfo (GstRTSPSrc *src, gchar *rtpinfo)
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_set_rtcp_interval (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_set_rtcp_interval (GstRTSPSrc * src, GstRTSPStream * stream,
     gpointer data)
 {
   guint64 interval = *((guint64 *) data);
@@ -8964,7 +8972,7 @@ gst_rtspsrc_stream_set_rtcp_interval (GstRTSPSrc *src, GstRTSPStream *stream,
 }
 
 static void
-gst_rtspsrc_handle_rtcp_interval (GstRTSPSrc *src, gchar *rtcp)
+gst_rtspsrc_handle_rtcp_interval (GstRTSPSrc * src, gchar * rtcp)
 {
   guint64 interval;
 
@@ -8993,7 +9001,7 @@ gst_rtspsrc_handle_rtcp_interval (GstRTSPSrc *src, gchar *rtcp)
 }
 
 static gdouble
-gst_rtspsrc_get_float (const gchar *dstr)
+gst_rtspsrc_get_float (const gchar * dstr)
 {
   gchar s[G_ASCII_DTOSTR_BUF_SIZE] = { 0, };
 
@@ -9005,7 +9013,7 @@ gst_rtspsrc_get_float (const gchar *dstr)
 }
 
 static gchar *
-gen_range_header (GstRTSPSrc *src, GstSegment *segment)
+gen_range_header (GstRTSPSrc * src, GstSegment * segment)
 {
   GstRTSPTimeRange range = { 0, };
   gdouble begin_seconds, end_seconds;
@@ -9081,7 +9089,7 @@ gen_range_header (GstRTSPSrc *src, GstSegment *segment)
 }
 
 static GstRTSPSrcForeachStreamReturn
-clear_rtp_base (GstRTSPSrc *src, GstRTSPStream *stream, gpointer data)
+clear_rtp_base (GstRTSPSrc * src, GstRTSPStream * stream, gpointer data)
 {
   guint i, len;
 
@@ -9107,7 +9115,7 @@ clear_rtp_base (GstRTSPSrc *src, GstRTSPStream *stream, gpointer data)
 }
 
 static GstRTSPResult
-gst_rtspsrc_ensure_open (GstRTSPSrc *src, gboolean async)
+gst_rtspsrc_ensure_open (GstRTSPSrc * src, gboolean async)
 {
   GstRTSPResult res = GST_RTSP_OK;
 
@@ -9147,7 +9155,8 @@ typedef struct
 } GstRTSPStreamPlay;
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_play (GstRTSPSrc *src, GstRTSPStream *stream, gpointer data)
+gst_rtspsrc_stream_play (GstRTSPSrc * src, GstRTSPStream * stream,
+    gpointer data)
 {
   const gchar *setup_url;
   GstRTSPConnInfo *conninfo;
@@ -9345,8 +9354,8 @@ gst_rtspsrc_stream_play (GstRTSPSrc *src, GstRTSPStream *stream, gpointer data)
 }
 
 static GstRTSPResult
-gst_rtspsrc_play (GstRTSPSrc *src, GstSegment *segment, gboolean async,
-    const gchar *seek_style)
+gst_rtspsrc_play (GstRTSPSrc * src, GstSegment * segment, gboolean async,
+    const gchar * seek_style)
 {
   GstSegment requested;
   GstRTSPStreamPlay play_data = {
@@ -9488,7 +9497,8 @@ typedef struct
 } GstRTSPStreamPause;
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_pause (GstRTSPSrc *src, GstRTSPStream *stream, gpointer data)
+gst_rtspsrc_stream_pause (GstRTSPSrc * src, GstRTSPStream * stream,
+    gpointer data)
 {
   GstRTSPStreamPause *pause_data = (GstRTSPStreamPause *) data;
   GstRTSPConnInfo *conninfo;
@@ -9543,7 +9553,7 @@ gst_rtspsrc_stream_pause (GstRTSPSrc *src, GstRTSPStream *stream, gpointer data)
 }
 
 static GstRTSPResult
-gst_rtspsrc_pause (GstRTSPSrc *src, gboolean async)
+gst_rtspsrc_pause (GstRTSPSrc * src, gboolean async)
 {
   const gchar *control;
   GstRTSPStreamPause pause_data = {
@@ -9638,7 +9648,7 @@ send_error:
 }
 
 static void
-gst_rtspsrc_handle_message (GstBin *bin, GstMessage *message)
+gst_rtspsrc_handle_message (GstBin * bin, GstMessage * message)
 {
   GstRTSPSrc *rtspsrc;
 
@@ -9726,7 +9736,7 @@ gst_rtspsrc_handle_message (GstBin *bin, GstMessage *message)
 
 /* the thread where everything happens */
 static void
-gst_rtspsrc_thread (GstRTSPSrc *src)
+gst_rtspsrc_thread (GstRTSPSrc * src)
 {
   gint cmd;
   ParameterRequest *req = NULL;
@@ -9810,7 +9820,7 @@ gst_rtspsrc_thread (GstRTSPSrc *src)
 }
 
 static gboolean
-gst_rtspsrc_start (GstRTSPSrc *src)
+gst_rtspsrc_start (GstRTSPSrc * src)
 {
   GST_DEBUG_OBJECT (src, "starting");
 
@@ -9839,7 +9849,7 @@ task_error:
 }
 
 static gboolean
-gst_rtspsrc_stop (GstRTSPSrc *src)
+gst_rtspsrc_stop (GstRTSPSrc * src)
 {
   GstTask *task;
 
@@ -9876,7 +9886,7 @@ gst_rtspsrc_stop (GstRTSPSrc *src)
 }
 
 static GstStateChangeReturn
-gst_rtspsrc_change_state (GstElement *element, GstStateChange transition)
+gst_rtspsrc_change_state (GstElement * element, GstStateChange transition)
 {
   GstRTSPSrc *rtspsrc;
   GstStateChangeReturn ret;
@@ -9981,7 +9991,7 @@ start_failed:
 }
 
 static gboolean
-gst_rtspsrc_send_event (GstElement *element, GstEvent *event)
+gst_rtspsrc_send_event (GstElement * element, GstEvent * event)
 {
   gboolean res;
   GstRTSPSrc *rtspsrc;
@@ -10027,7 +10037,7 @@ gst_rtspsrc_uri_get_protocols (GType type)
 }
 
 static gchar *
-gst_rtspsrc_uri_get_uri (GstURIHandler *handler)
+gst_rtspsrc_uri_get_uri (GstURIHandler * handler)
 {
   GstRTSPSrc *src = GST_RTSPSRC (handler);
 
@@ -10036,8 +10046,8 @@ gst_rtspsrc_uri_get_uri (GstURIHandler *handler)
 }
 
 static gboolean
-gst_rtspsrc_uri_set_uri (GstURIHandler *handler, const gchar *uri,
-    GError **error)
+gst_rtspsrc_uri_set_uri (GstURIHandler * handler, const gchar * uri,
+    GError ** error)
 {
   GstRTSPSrc *src;
   GstRTSPResult res;
@@ -10138,7 +10148,7 @@ gst_rtspsrc_uri_handler_init (gpointer g_iface, gpointer iface_data)
 
 /* send GET_PARAMETER */
 static GstRTSPResult
-gst_rtspsrc_get_parameter (GstRTSPSrc *src, ParameterRequest *req)
+gst_rtspsrc_get_parameter (GstRTSPSrc * src, ParameterRequest * req)
 {
   GstRTSPMessage request = { 0 };
   GstRTSPMessage response = { 0 };
@@ -10259,7 +10269,7 @@ get_body_failed:
 
 /* send SET_PARAMETER */
 static GstRTSPResult
-gst_rtspsrc_set_parameter (GstRTSPSrc *src, ParameterRequest *req)
+gst_rtspsrc_set_parameter (GstRTSPSrc * src, ParameterRequest * req)
 {
   GstRTSPMessage request = { 0 };
   GstRTSPMessage response = { 0 };
@@ -10368,7 +10378,7 @@ typedef struct _RTSPKeyValue
 } RTSPKeyValue;
 
 static void
-key_value_foreach (GArray *array, GFunc func, gpointer user_data)
+key_value_foreach (GArray * array, GFunc func, gpointer user_data)
 {
   guint i;
 
@@ -10396,7 +10406,7 @@ dump_key_value (gpointer data, gpointer user_data G_GNUC_UNUSED)
 }
 
 static void
-gst_rtspsrc_print_rtsp_message (GstRTSPSrc *src, const GstRTSPMessage *msg)
+gst_rtspsrc_print_rtsp_message (GstRTSPSrc * src, const GstRTSPMessage * msg)
 {
   guint8 *data;
   guint size;
@@ -10504,7 +10514,7 @@ gst_rtspsrc_print_rtsp_message (GstRTSPSrc *src, const GstRTSPMessage *msg)
 }
 
 static void
-gst_rtspsrc_print_sdp_media (GstRTSPSrc *src, GstSDPMedia *media)
+gst_rtspsrc_print_sdp_media (GstRTSPSrc * src, GstSDPMedia * media)
 {
   GST_LOG_OBJECT (src, "   media:       '%s'", GST_STR_NULL (media->media));
   GST_LOG_OBJECT (src, "   port:        '%u'", media->port);
@@ -10568,7 +10578,7 @@ gst_rtspsrc_print_sdp_media (GstRTSPSrc *src, GstSDPMedia *media)
 }
 
 void
-gst_rtspsrc_print_sdp_message (GstRTSPSrc *src, const GstSDPMessage *msg)
+gst_rtspsrc_print_sdp_message (GstRTSPSrc * src, const GstSDPMessage * msg)
 {
   g_return_if_fail (src != NULL);
   g_return_if_fail (msg != NULL);
