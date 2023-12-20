@@ -117,8 +117,14 @@
 #include "gstrtspelements.h"
 #include "gstrtspsrc.h"
 
-GST_DEBUG_CATEGORY (rtspsrc_debug);
+GST_DEBUG_CATEGORY_STATIC (rtspsrc_debug);
 #define GST_CAT_DEFAULT (rtspsrc_debug)
+
+GType gst_rtsp_stream_get_type(void);
+G_DEFINE_TYPE(GstRTSPStream, gst_rtsp_stream, GST_TYPE_OBJECT);
+
+#define GST_RTSP_STREAMS_LOCK(x) g_mutex_lock (&(x)->streams_lock)
+#define GST_RTSP_STREAMS_UNLOCK(x) g_mutex_unlock (&(x)->streams_lock)
 
 static GstStaticPadTemplate rtptemplate = GST_STATIC_PAD_TEMPLATE ("stream_%u",
     GST_PAD_SRC,
@@ -1544,6 +1550,7 @@ gst_rtspsrc_init (GstRTSPSrc *src)
   g_cond_init (&src->cmd_cond);
 
   g_mutex_init (&src->group_lock);
+  g_mutex_init(&src->streams_lock);
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
   gst_bin_set_suppressed_flags (GST_BIN (src),
@@ -1604,6 +1611,7 @@ gst_rtspsrc_finalize (GObject *object)
   g_cond_clear (&rtspsrc->cmd_cond);
 
   g_mutex_clear (&rtspsrc->group_lock);
+  g_mutex_clear (&rtspsrc->streams_lock);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -2288,9 +2296,6 @@ get_aggregate_control (GstRTSPSrc *src)
   return base;
 }
 
-GType gst_rtsp_stream_get_type (void);
-G_DEFINE_TYPE (GstRTSPStream, gst_rtsp_stream, GST_TYPE_OBJECT);
-
 static gint
 find_stream_by_id (GstRTSPStream *stream, gint *id)
 {
@@ -2359,8 +2364,44 @@ find_stream_locked (GstRTSPSrc *src, gconstpointer data, gconstpointer func)
 }
 
 static void
+gst_rtsp_stream_finalize(GObject *object)
+{
+  GstRTSPStream* stream = (GstRTSPStream*)object;
+
+  g_array_free(stream->ptmap, TRUE);
+
+  g_free(stream->destination);
+  g_free(stream->control_url);
+  g_free(stream->conninfo.location);
+  g_free(stream->stream_id);
+
+  if (stream->srtpenc)
+    gst_object_unref(stream->srtpenc);
+  if (stream->srtpdec)
+    gst_object_unref(stream->srtpdec);
+  if (stream->srtcpparams)
+    gst_caps_unref(stream->srtcpparams);
+  if (stream->mikey)
+    gst_mikey_message_unref(stream->mikey);
+  if (stream->rtcppad)
+    gst_object_unref(stream->rtcppad);
+  if (stream->session)
+    g_object_unref(stream->session);
+  if (stream->rtx_pt_map)
+    gst_structure_free(stream->rtx_pt_map);
+
+  g_mutex_clear(&stream->conninfo.send_lock);
+  g_mutex_clear(&stream->conninfo.recv_lock);
+
+  G_OBJECT_CLASS(gst_rtsp_stream_parent_class)->finalize(object);
+}
+
+static void
 gst_rtsp_stream_class_init (GstRTSPStreamClass *klass)
 {
+  GObjectClass* gobject_class = (GObjectClass*)klass;
+
+  gobject_class->finalize = gst_rtsp_stream_finalize;
 }
 
 static void
@@ -2478,10 +2519,10 @@ gst_rtspsrc_create_stream (GstRTSPSrc *src, GstSDPMessage *sdp, gint idx,
       GST_STR_NULL (stream->conninfo.location));
 
   /* we keep track of all streams */
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   src->streams = g_list_append (src->streams, stream);
   src->streams_cookie++;
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 
   return stream;
 
@@ -2520,11 +2561,11 @@ gst_rtspsrc_foreach_stream (GstRTSPSrc *src, GstRTSPSrcForeachStream func,
   GValue data = G_VALUE_INIT;
   GstRTSPSrcForeachStreamReturn ret = GST_RTSPSRC_FOREACH_STREAM_CONTINUE;
 
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   it = gst_iterator_new_list (GST_TYPE_OBJECT,
-      GST_OBJECT_GET_LOCK (src),
+      &src->streams_lock,
       &src->streams_cookie, &src->streams, (GObject *) src, NULL);
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 
   done = FALSE;
   while (!done) {
@@ -2555,71 +2596,42 @@ gst_rtspsrc_foreach_stream (GstRTSPSrc *src, GstRTSPSrcForeachStream func,
 }
 
 static GstRTSPSrcForeachStreamReturn
-gst_rtspsrc_stream_free (GstRTSPSrc *src, GstRTSPStream *stream,
+gst_rtspsrc_stream_release (GstRTSPSrc *src, GstRTSPStream *stream,
     gpointer user_data)
 {
   gint i;
-
-  GST_DEBUG_OBJECT (src, "free stream %p", stream);
-
-  g_array_free (stream->ptmap, TRUE);
-
-  g_free (stream->destination);
-  g_free (stream->control_url);
-  g_free (stream->conninfo.location);
-  g_free (stream->stream_id);
-
+  GST_DEBUG_OBJECT(src, "free stream %" GST_PTR_FORMAT, stream);
   for (i = 0; i < 2; i++) {
     if (stream->udpsrc[i]) {
-      gst_element_set_state (stream->udpsrc[i], GST_STATE_NULL);
-      if (gst_object_has_as_parent (GST_OBJECT (stream->udpsrc[i]),
-              GST_OBJECT (src)))
-        gst_bin_remove (GST_BIN_CAST (src), stream->udpsrc[i]);
-      gst_object_unref (stream->udpsrc[i]);
+      gst_element_set_state(stream->udpsrc[i], GST_STATE_NULL);
+      if (gst_object_has_as_parent(GST_OBJECT(stream->udpsrc[i]),
+        GST_OBJECT(src)))
+        gst_bin_remove(GST_BIN_CAST(src), stream->udpsrc[i]);
+      gst_object_unref(stream->udpsrc[i]);
     }
     if (stream->channelpad[i])
-      gst_object_unref (stream->channelpad[i]);
+      gst_object_unref(stream->channelpad[i]);
 
     if (stream->udpsink[i]) {
-      gst_element_set_state (stream->udpsink[i], GST_STATE_NULL);
-      if (gst_object_has_as_parent (GST_OBJECT (stream->udpsink[i]),
-              GST_OBJECT (src)))
-        gst_bin_remove (GST_BIN_CAST (src), stream->udpsink[i]);
-      gst_object_unref (stream->udpsink[i]);
+      gst_element_set_state(stream->udpsink[i], GST_STATE_NULL);
+      if (gst_object_has_as_parent(GST_OBJECT(stream->udpsink[i]),
+        GST_OBJECT(src)))
+        gst_bin_remove(GST_BIN_CAST(src), stream->udpsink[i]);
+      gst_object_unref(stream->udpsink[i]);
     }
   }
   if (stream->rtpsrc) {
-    gst_element_set_state (stream->rtpsrc, GST_STATE_NULL);
-    gst_bin_remove (GST_BIN_CAST (src), stream->rtpsrc);
-    gst_object_unref (stream->rtpsrc);
+    gst_element_set_state(stream->rtpsrc, GST_STATE_NULL);
+    gst_bin_remove(GST_BIN_CAST(src), stream->rtpsrc);
+    gst_object_unref(stream->rtpsrc);
   }
   if (stream->srcpad) {
-    gst_pad_set_active (stream->srcpad, FALSE);
+    gst_pad_set_active(stream->srcpad, FALSE);
     if (stream->added)
-      gst_element_remove_pad (GST_ELEMENT_CAST (src), stream->srcpad);
+      gst_element_remove_pad(GST_ELEMENT_CAST(src), stream->srcpad);
   }
-  if (stream->srtpenc)
-    gst_object_unref (stream->srtpenc);
-  if (stream->srtpdec)
-    gst_object_unref (stream->srtpdec);
-  if (stream->srtcpparams)
-    gst_caps_unref (stream->srtcpparams);
-  if (stream->mikey)
-    gst_mikey_message_unref (stream->mikey);
-  if (stream->rtcppad)
-    gst_object_unref (stream->rtcppad);
-  if (stream->session)
-    g_object_unref (stream->session);
-  if (stream->rtx_pt_map)
-    gst_structure_free (stream->rtx_pt_map);
 
-  gst_object_unparent (GST_OBJECT (stream));
-
-  g_mutex_clear (&stream->conninfo.send_lock);
-  g_mutex_clear (&stream->conninfo.recv_lock);
-
-  g_free (stream);
-
+  gst_object_unparent(GST_OBJECT(stream));
   return GST_RTSPSRC_FOREACH_STREAM_CONTINUE;
 }
 
@@ -2630,11 +2642,11 @@ gst_rtspsrc_cleanup (GstRTSPSrc *src)
 
   GST_DEBUG_OBJECT (src, "cleanup");
 
-  gst_rtspsrc_foreach_stream (src, gst_rtspsrc_stream_free, NULL);
+  gst_rtspsrc_foreach_stream (src, gst_rtspsrc_stream_release, NULL);
 
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   g_clear_pointer (&src->streams, g_list_free);
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 
   if (src->manager) {
     if (src->manager_sig_id) {
@@ -3002,12 +3014,12 @@ gst_rtspsrc_mark_discount (GstRTSPSrc *src)
 {
   GList *walk;
 
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   for (walk = src->streams; walk; walk = g_list_next (walk)) {
     GstRTSPStream *stream = (GstRTSPStream *) walk->data;
     stream->discont = TRUE;
   }
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 }
 
 static gboolean
@@ -3522,9 +3534,9 @@ gst_rtspsrc_push_backchannel_sample (GstRTSPSrc *src, guint id,
   if (!src->conninfo.connected || src->state != GST_RTSP_STATE_PLAYING)
     goto out;
 
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   stream = find_stream_locked (src, &id, (gpointer) find_stream_by_id);
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 
   if (stream == NULL) {
     GST_ERROR_OBJECT (src, "no stream with id %u", id);
@@ -3687,9 +3699,9 @@ new_manager_pad (GstElement *manager, GstPad *pad, GstRTSPSrc *src)
 
   GST_DEBUG_OBJECT (src, "stream: %u, SSRC %08x, PT %d", id, ssrc, pt);
 
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   stream = find_stream_locked (src, &id, (gpointer) find_stream_by_id);
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 
   if (stream == NULL)
     goto unknown_stream;
@@ -3702,7 +3714,7 @@ new_manager_pad (GstElement *manager, GstPad *pad, GstRTSPSrc *src)
 
   /* check if we added all streams */
   all_added = TRUE;
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   for (ostreams = src->streams; ostreams; ostreams = g_list_next (ostreams)) {
     GstRTSPStream *ostream = (GstRTSPStream *) ostreams->data;
 
@@ -3716,7 +3728,7 @@ new_manager_pad (GstElement *manager, GstPad *pad, GstRTSPSrc *src)
       break;
     }
   }
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
   GST_RTSP_STATE_UNLOCK (src);
 
   /* create a new pad we will use to stream to */
@@ -3777,9 +3789,9 @@ request_pt_map (GstElement *manager, guint session, guint pt, GstRTSPSrc *src)
   GST_DEBUG_OBJECT (src, "getting pt map for pt %d in session %d", pt, session);
 
   GST_RTSP_STATE_LOCK (src);
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   stream = find_stream_locked (src, &session, (gpointer) find_stream_by_id);
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
   if (!stream)
     goto unknown_stream;
 
@@ -3932,7 +3944,7 @@ on_timeout_common (GObject *session, GObject *source, GstRTSPStream *stream)
      * might just be inactive currently.
      */
 
-    GST_OBJECT_LOCK (src);
+    GST_RTSP_STREAMS_LOCK (src);
     for (walk = src->streams; walk; walk = g_list_next (walk)) {
       GstRTSPStream *stream = (GstRTSPStream *) walk->data;
 
@@ -3945,7 +3957,7 @@ on_timeout_common (GObject *session, GObject *source, GstRTSPStream *stream)
         break;
       }
     }
-    GST_OBJECT_UNLOCK (src);
+    GST_RTSP_STREAMS_UNLOCK (src);
 
     if (all_eos) {
       GST_DEBUG_OBJECT (src, "sending EOS on all streams");
@@ -3988,9 +4000,9 @@ on_npt_stop (GstElement *rtpbin, guint session, guint ssrc, GstRTSPSrc *src)
   GST_DEBUG_OBJECT (src, "source in session %u reached NPT stop", session);
 
   /* get stream for session */
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   stream = find_stream_locked (src, &session, (gpointer) find_stream_by_id);
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
   if (stream) {
     gst_rtspsrc_do_stream_eos (src, stream);
   }
@@ -4191,9 +4203,9 @@ request_aux_receiver (GstElement *rtpbin, guint sessid, GstRTSPSrc *src)
   gchar *name;
   GstRTSPStream *stream;
 
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   stream = find_stream_locked (src, &sessid, (gpointer) find_stream_by_id);
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   if (!stream) {
     GST_WARNING_OBJECT (src, "Stream %u not found", sessid);
     return NULL;
@@ -4246,7 +4258,7 @@ add_retransmission (GstRTSPSrc *src, GstRTSPTransport *transport)
   }
 
   /* build the retransmission payload type map */
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   for (walk = src->streams; walk; walk = g_list_next (walk)) {
     GstRTSPStream *stream = (GstRTSPStream *) walk->data;
     gboolean do_retransmission_stream = FALSE;
@@ -4290,7 +4302,7 @@ add_retransmission (GstRTSPSrc *src, GstRTSPTransport *transport)
       stream->rtx_pt_map = NULL;
     }
   }
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 
   if (do_retransmission) {
     GST_DEBUG_OBJECT (src, "Enabling retransmissions");
@@ -5319,7 +5331,7 @@ gst_rtspsrc_activate_streams (GstRTSPSrc *src)
   gst_rtspsrc_foreach_stream (src, gst_rtspsrc_stream_activate, NULL);
 
   /* unblock all pads */
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   for (walk = src->streams; walk; walk = g_list_next (walk)) {
     GstRTSPStream *stream = (GstRTSPStream *) walk->data;
 
@@ -5331,7 +5343,7 @@ gst_rtspsrc_activate_streams (GstRTSPSrc *src)
       stream->blockid = 0;
     }
   }
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 
   return TRUE;
 }
@@ -5351,7 +5363,7 @@ gst_rtspsrc_configure_caps (GstRTSPSrc *src, GstSegment *segment,
   play_speed = segment->rate;
   play_scale = segment->applied_rate;
 
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   for (walk = src->streams; walk; walk = g_list_next (walk)) {
     GstRTSPStream *stream = (GstRTSPStream *) walk->data;
     guint j, len;
@@ -5394,7 +5406,7 @@ gst_rtspsrc_configure_caps (GstRTSPSrc *src, GstSegment *segment,
       }
     }
   }
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
   if (reset_manager && src->manager) {
     GST_DEBUG_OBJECT (src, "clear session");
     g_signal_emit_by_name (src->manager, "clear-pt-map", NULL);
@@ -5420,7 +5432,7 @@ gst_rtspsrc_combine_flows (GstRTSPSrc *src, GstRTSPStream *stream,
     goto done;
 
   /* only return NOT_LINKED if all other pads returned NOT_LINKED */
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   for (streams = src->streams; streams; streams = g_list_next (streams)) {
     GstRTSPStream *ostream = (GstRTSPStream *) streams->data;
 
@@ -5430,7 +5442,7 @@ gst_rtspsrc_combine_flows (GstRTSPSrc *src, GstRTSPStream *stream,
     if (ret != GST_FLOW_NOT_LINKED)
       break;
   }
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
   /* if we get here, all other pads were unlinked and we return
    * NOT_LINKED then */
 done:
@@ -5621,7 +5633,7 @@ gst_rtspsrc_connection_flush (GstRTSPSrc *src, gboolean flush)
     gst_rtsp_connection_flush (src->conninfo.connection, flush);
     src->conninfo.flushing = flush;
   }
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   for (walk = src->streams; walk; walk = g_list_next (walk)) {
     GstRTSPStream *stream = (GstRTSPStream *) walk->data;
     if (stream->conninfo.connection && stream->conninfo.flushing != flush) {
@@ -5630,7 +5642,7 @@ gst_rtspsrc_connection_flush (GstRTSPSrc *src, gboolean flush)
       stream->conninfo.flushing = flush;
     }
   }
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
   GST_RTSP_STATE_UNLOCK (src);
 }
 
@@ -5839,10 +5851,10 @@ gst_rtspsrc_handle_data (GstRTSPSrc *src, GstRTSPMessage *message)
 
   channel = message->type_data.data.channel;
 
-  GST_OBJECT_LOCK (src);
+  GST_RTSP_STREAMS_LOCK (src);
   stream =
       find_stream_locked (src, &channel, (gpointer) find_stream_by_channel);
-  GST_OBJECT_UNLOCK (src);
+  GST_RTSP_STREAMS_UNLOCK (src);
 
   if (!stream)
     goto unknown_stream;
@@ -8905,12 +8917,12 @@ gst_rtspsrc_parse_rtpinfo (GstRTSPSrc *src, gchar *rtpinfo)
       /* remove leading whitespace */
       fields[j] = g_strchug (fields[j]);
       if (g_str_has_prefix (fields[j], "url=")) {
-        GST_OBJECT_LOCK (src);
+        GST_RTSP_STREAMS_LOCK (src);
         /* get the url and the stream */
         stream =
             find_stream_locked (src, (fields[j] + 4),
             (gpointer) find_stream_by_setup);
-        GST_OBJECT_UNLOCK (src);
+        GST_RTSP_STREAMS_UNLOCK (src);
       } else if (g_str_has_prefix (fields[j], "seq=")) {
         seqbase = atoi (fields[j] + 4);
       } else if (g_str_has_prefix (fields[j], "rtptime=")) {
@@ -9674,11 +9686,11 @@ gst_rtspsrc_handle_message (GstBin *bin, GstMessage *message)
       GST_DEBUG_OBJECT (rtspsrc, "got error from %s",
           GST_ELEMENT_NAME (udpsrc));
 
-      GST_OBJECT_LOCK (rtspsrc);
+      GST_RTSP_STREAMS_LOCK (rtspsrc);
       stream =
           find_stream_locked (rtspsrc, udpsrc,
           (gpointer) find_stream_by_udpsrc);
-      GST_OBJECT_UNLOCK (rtspsrc);
+      GST_RTSP_STREAMS_UNLOCK (rtspsrc);
       if (!stream)
         goto forward;
 
@@ -9753,7 +9765,6 @@ gst_rtspsrc_thread (GstRTSPSrc *src)
 
   /* we got the message command, so ensure communication is possible again */
   gst_rtspsrc_connection_flush (src, FALSE);
-
   src->busy_cmd = cmd;
   GST_OBJECT_UNLOCK (src);
 

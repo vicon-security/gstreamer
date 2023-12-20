@@ -225,6 +225,7 @@ struct _GstRTSPSrc {
   gboolean         from_sdp;
   GList           *streams;
   guint32          streams_cookie;
+  GMutex           streams_lock;
   GstStructure    *props;
   gboolean         need_activate;
 
