@@ -7707,6 +7707,7 @@ typedef struct
 {
   GstRTSPLowerTrans protocols;
   gboolean async;
+  GstRTSPResult res;
   gint rtpport, rtcpport;
   GstRTSPMessage request;
   GstRTSPMessage response;
@@ -7726,7 +7727,6 @@ static GstRTSPSrcForeachStreamReturn
 gst_rtspsrc_stream_setup_start (GstRTSPSrc *src, GstRTSPStream *stream,
     gpointer data)
 {
-  GstRTSPResult res;
   GstRTSPConnInfo *conninfo;
   gchar *transports;
   gint retry = 0;
@@ -7828,10 +7828,10 @@ retry:
       setup_data->protocols, protocol_masks[mask]);
   /* create a string with first transport in line */
   transports = NULL;
-  res = gst_rtspsrc_create_transports_string (src,
+  setup_data->res = gst_rtspsrc_create_transports_string (src,
       (setup_data->protocols & protocol_masks[mask]),
       stream->profile, &transports);
-  if (res < 0 || transports == NULL) {
+  if (setup_data->res < 0 || transports == NULL) {
     setup_data->ret_setup_transport_failed = TRUE;
     return GST_RTSPSRC_FOREACH_STREAM_INTERRUPT;
   }
@@ -7847,10 +7847,10 @@ retry:
 
   /* replace placeholders with real values, this function will optionally
    * allocate UDP ports and other info needed to execute the setup request */
-  res = gst_rtspsrc_prepare_transports (stream, &transports,
+  setup_data->res = gst_rtspsrc_prepare_transports (stream, &transports,
       retry > 0 ? setup_data->rtpport : 0,
       retry > 0 ? setup_data->rtcpport : 0);
-  if (res < 0) {
+  if (setup_data->res < 0) {
     g_free (transports);
     setup_data->ret_setup_transport_failed = TRUE;
     return GST_RTSPSRC_FOREACH_STREAM_INTERRUPT;
@@ -7858,10 +7858,10 @@ retry:
 
   GST_DEBUG_OBJECT (src, "transport is now %s", GST_STR_NULL (transports));
   /* create SETUP request */
-  res =
+  setup_data->res =
       gst_rtspsrc_init_request (src, &setup_data->request, GST_RTSP_SETUP,
       stream->conninfo.location);
-  if (res < 0) {
+  if (setup_data->res < 0) {
     g_free (transports);
     setup_data->ret_create_request_failed = TRUE;
     return GST_RTSPSRC_FOREACH_STREAM_INTERRUPT;
@@ -7908,11 +7908,11 @@ retry:
             stream->id));
 
   /* handle the code ourselves */
-  res =
+  setup_data->res =
       gst_rtspsrc_send (src, conninfo, &setup_data->request,
       setup_data->pipelined_request_id ? NULL : &setup_data->response,
       &setup_data->code, NULL);
-  if (res < 0) {
+  if (setup_data->res < 0) {
     setup_data->ret_send_error = TRUE;
     return GST_RTSPSRC_FOREACH_STREAM_INTERRUPT;
   }
@@ -8001,10 +8001,10 @@ retry:
 
   if (!setup_data->pipelined_request_id) {
     /* parse response transport */
-    res = gst_rtsp_src_setup_stream_from_response (src, stream,
+    setup_data->res = gst_rtsp_src_setup_stream_from_response (src, stream,
         &setup_data->response, &setup_data->protocols, retry,
         &setup_data->rtpport, &setup_data->rtcpport);
-    switch (res) {
+    switch (setup_data->res) {
       case GST_RTSP_ERROR:
         setup_data->ret_cleanup_error = TRUE;
         return GST_RTSPSRC_FOREACH_STREAM_INTERRUPT;
@@ -8043,9 +8043,11 @@ retry:
 static GstRTSPResult
 gst_rtspsrc_setup_streams_start (GstRTSPSrc *src, gboolean async)
 {
-  GstRTSPResult res = GST_RTSP_ERROR;
   GstRTSPUrl *url;
-  GstRTSPSrcSetupStart setup_data = {.async = async, 0 };
+  GstRTSPSrcSetupStart setup_data = {
+    .async = async,
+    .res = GST_RTSP_ERROR
+  };
 
   if (src->conninfo.connection) {
     url = gst_rtsp_connection_get_url (src->conninfo.connection);
@@ -8108,7 +8110,7 @@ gst_rtspsrc_setup_streams_start (GstRTSPSrc *src, gboolean async)
   if (!src->need_activate)
     goto nothing_to_activate;
 
-  return res;
+  return setup_data.res;
 
   /* ERRORS */
 no_protocols:
@@ -8126,7 +8128,7 @@ no_streams:
   }
 create_request_failed:
   {
-    gchar *str = gst_rtsp_strresult (res);
+    gchar *str = gst_rtsp_strresult (setup_data.res);
 
     GST_ELEMENT_ERROR (src, LIBRARY, INIT, (NULL),
         ("Could not create request. (%s)", str));
@@ -8137,7 +8139,7 @@ setup_transport_failed:
   {
     GST_ELEMENT_ERROR (src, RESOURCE, SETTINGS, (NULL),
         ("Could not setup transport."));
-    res = GST_RTSP_ERROR;
+    setup_data.res = GST_RTSP_ERROR;
     goto cleanup_error;
   }
 response_error:
@@ -8146,14 +8148,14 @@ response_error:
 
     GST_ELEMENT_ERROR (src, RESOURCE, WRITE, (NULL),
         ("Error (%d): %s", setup_data.code, GST_STR_NULL (str)));
-    res = GST_RTSP_ERROR;
+    setup_data.res = GST_RTSP_ERROR;
     goto cleanup_error;
   }
 send_error:
   {
-    gchar *str = gst_rtsp_strresult (res);
+    gchar *str = gst_rtsp_strresult (setup_data.res);
 
-    if (res != GST_RTSP_EINTR) {
+    if (setup_data.res != GST_RTSP_EINTR) {
       GST_ELEMENT_ERROR (src, RESOURCE, WRITE, (NULL),
           ("Could not send message. (%s)", str));
     } else {
@@ -8183,7 +8185,7 @@ cleanup_error:
     g_clear_pointer (&setup_data.pipelined_request_id, g_free);
     gst_rtsp_message_unset (&setup_data.request);
     gst_rtsp_message_unset (&setup_data.response);
-    return res;
+    return setup_data.res;
   }
 }
 
@@ -8939,8 +8941,8 @@ gst_rtspsrc_parse_rtpinfo (GstRTSPSrc *src, gchar *rtpinfo)
       /* we have a stream, configure detected params */
       stream->seqbase = seqbase;
       stream->timebase = timebase;
+      gst_object_unref(stream);
     }
-    gst_object_unref (stream);
   }
   g_strfreev (infos);
 
@@ -9393,7 +9395,7 @@ restart:
       goto restart;
     if (play_data.ret_send_error)
       goto send_error;
-    g_warn_if_reached ();
+    g_warn_if_fail (play_data.control != NULL);
   }
 
   src->out_segment = *segment;
