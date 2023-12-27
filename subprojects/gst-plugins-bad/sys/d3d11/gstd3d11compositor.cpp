@@ -1307,6 +1307,10 @@ gst_d3d11_compositor_stop (GstAggregator * agg)
 {
   GstD3D11Compositor *self = GST_D3D11_COMPOSITOR (agg);
 
+  gst_element_foreach_sink_pad(GST_ELEMENT_CAST(self),
+    (GstElementForeachPadFunc)gst_d3d11_compositor_pad_clear_resource,
+    nullptr);
+
   g_clear_pointer (&self->checker_background, gst_d3d11_compositor_quad_free);
   gst_clear_object (&self->device);
   gst_clear_caps (&self->negotiated_caps);
