@@ -1311,6 +1311,11 @@ gst_d3d11_compositor_stop (GstAggregator * agg)
   gst_clear_object (&self->device);
   gst_clear_caps (&self->negotiated_caps);
 
+  /* Clear all device dependent resources */
+  gst_element_foreach_sink_pad (GST_ELEMENT_CAST (self),
+      (GstElementForeachPadFunc) gst_d3d11_compositor_pad_clear_resource,
+      nullptr);
+
   return GST_AGGREGATOR_CLASS (parent_class)->stop (agg);
 }
 
