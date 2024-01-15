@@ -1726,12 +1726,16 @@ gst_aggregator_default_sink_event (GstAggregator * self,
         SRC_LOCK (self);
         priv->send_eos = TRUE;
         priv->got_eos_event = FALSE;
+        priv->first_buffer = TRUE;
         SRC_BROADCAST (self);
         SRC_UNLOCK (self);
 
         GST_INFO_OBJECT (self, "Flush stopped");
 
-        gst_aggregator_start_srcpad_task (self);
+        if (self->priv->start_time_selection !=
+            GST_AGGREGATOR_START_TIME_SELECTION_FIRST)
+          gst_aggregator_start_srcpad_task (self);
+
       } else {
         GST_OBJECT_UNLOCK (self);
       }
@@ -3239,6 +3243,19 @@ gst_aggregator_pad_chain_internal (GstAggregator * self,
 
       GST_DEBUG_OBJECT (self, "Selecting start time %" GST_TIME_FORMAT,
           GST_TIME_ARGS (start_time));
+
+
+      if (self->priv->start_time_selection ==
+          GST_AGGREGATOR_START_TIME_SELECTION_FIRST && !self->priv->running) {
+        PAD_UNLOCK (aggpad);
+        GST_OBJECT_UNLOCK (self);
+
+        gst_aggregator_start_srcpad_task (self);
+
+        GST_OBJECT_LOCK (self);
+        PAD_LOCK (aggpad);
+
+      }
     }
   }
 
