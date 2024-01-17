@@ -92,6 +92,15 @@ enum
 #define DEFAULT_ADAPTER 0
 #define DEFAULT_CREATE_FLAGS 0
 
+enum
+{
+  /* signals */
+  SIGNAL_SUSPENDED,
+  LAST_SIGNAL
+};
+
+static guint gst_d3d11_device_signals[LAST_SIGNAL] = { 0, };
+
 struct _GstD3D11DevicePrivate
 {
   guint adapter;
@@ -101,6 +110,7 @@ struct _GstD3D11DevicePrivate
   gchar *description;
   guint create_flags;
   gint64 adapter_luid;
+  gboolean suspended;
 
   ID3D11Device *device;
   ID3D11Device5 *device5;
@@ -394,6 +404,20 @@ gst_d3d11_device_class_init (GstD3D11DeviceClass * klass)
       g_param_spec_int64 ("adapter-luid", "Adapter LUID",
           "DXGI Adapter LUID (Locally Unique Identifier) of created device",
           G_MININT64, G_MAXINT64, 0, readable_flags));
+
+  /**
+   * GstD3D11Device::suspended:
+   * @device: the #d3d11device
+   *
+   * Emitted when the D3D11Device gets suspended by the DirectX (error
+   * DXGI_ERROR_DEVICE_REMOVED have been returned from some of the DirectX
+   * operations).
+   *
+   * Since: cemtrex patch to 1.22.4
+   */
+  gst_d3d11_device_signals[SIGNAL_SUSPENDED] =
+    g_signal_new ("suspended", G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_LAST,
+      0, NULL, NULL, NULL, G_TYPE_NONE, 0, G_TYPE_NONE);
 
   gst_d3d11_memory_init_once ();
 }
@@ -1191,7 +1215,7 @@ gst_d3d11_device_new_wrapped (ID3D11Device * device)
  * Used for various D3D11 APIs directly. Caller must not destroy returned device
  * object.
  *
- * Returns: (transfer none): the ID3D11Device handle
+ * Returns: (transfer none): the ID3D11Device handle or NULL if the device had been suspended
  *
  * Since: 1.22
  */
@@ -1200,7 +1224,7 @@ gst_d3d11_device_get_device_handle (GstD3D11Device * device)
 {
   g_return_val_if_fail (GST_IS_D3D11_DEVICE (device), NULL);
 
-  return device->priv->device;
+  return G_UNLIKELY (device->priv->suspended) ? NULL : device->priv->device;
 }
 
 /**
@@ -1220,7 +1244,7 @@ gst_d3d11_device_get_device_context_handle (GstD3D11Device * device)
 {
   g_return_val_if_fail (GST_IS_D3D11_DEVICE (device), NULL);
 
-  return device->priv->device_context;
+  return G_UNLIKELY (device->priv->suspended) ? NULL : device->priv->device_context;
 }
 
 /**
@@ -1239,7 +1263,7 @@ gst_d3d11_device_get_dxgi_factory_handle (GstD3D11Device * device)
 {
   g_return_val_if_fail (GST_IS_D3D11_DEVICE (device), NULL);
 
-  return device->priv->factory;
+  return G_UNLIKELY (device->priv->suspended) ? NULL : device->priv->factory;
 }
 
 /**
@@ -1263,6 +1287,8 @@ gst_d3d11_device_get_video_device_handle (GstD3D11Device * device)
 
   priv = device->priv;
   GstD3D11SRWLockGuard lk (&priv->resource_lock);
+  if (G_UNLIKELY (priv->suspended))
+    return NULL;
   if (!priv->video_device) {
     HRESULT hr;
     ID3D11VideoDevice *video_device = NULL;
@@ -1296,6 +1322,8 @@ gst_d3d11_device_get_video_context_handle (GstD3D11Device * device)
 
   priv = device->priv;
   GstD3D11SRWLockGuard lk (&priv->resource_lock);
+  if (G_UNLIKELY (priv->suspended))
+    return NULL;
   if (!priv->video_context) {
     HRESULT hr;
     ID3D11VideoContext *video_context = NULL;
@@ -1394,6 +1422,19 @@ gst_d3d11_device_get_format (GstD3D11Device * device, GstVideoFormat format,
     gst_d3d11_format_init (device_format);
 
   return FALSE;
+}
+
+void
+gst_d3d11_device_mark_suspended (GstD3D11Device* device)
+{
+  g_return_if_fail (GST_IS_D3D11_DEVICE (device));
+
+  if (!device->priv->suspended) {
+    g_signal_emit (device, gst_d3d11_device_signals[SIGNAL_SUSPENDED], 0,
+      NULL);
+    // TODO: will require massive modification
+    //device->priv->suspended = TRUE;
+  }
 }
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstD3D11Fence, gst_d3d11_fence);

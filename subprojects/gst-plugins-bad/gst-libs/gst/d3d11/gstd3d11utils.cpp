@@ -568,6 +568,19 @@ gboolean
 _gst_d3d11_result (HRESULT hr, GstD3D11Device * device, GstDebugCategory * cat,
     const gchar * file, const gchar * function, gint line)
 {
+  if (hr == DXGI_ERROR_DEVICE_REMOVED)
+  {
+    gst_debug_log (cat, GST_LEVEL_WARNING, file, function, line,
+      NULL, "Error DXGI_ERROR_DEVICE_REMOVED: Device instance has been suspended."
+      " This is usually caused by high GPU load or an invalid call. "
+      " This GstD3D11Device will not return it's handles anymore:"
+      " must be created again");
+    g_warning ("Error DXGI_ERROR_DEVICE_REMOVED raised by the GPU on device %s",
+      device ? GST_OBJECT_NAME (device) : "null");
+
+    gst_d3d11_device_mark_suspended (device);
+  }
+
 #ifndef GST_DISABLE_GST_DEBUG
   gboolean ret = TRUE;
 
