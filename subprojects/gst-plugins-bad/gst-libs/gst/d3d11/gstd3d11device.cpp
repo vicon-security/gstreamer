@@ -1215,7 +1215,7 @@ gst_d3d11_device_new_wrapped (ID3D11Device * device)
  * Used for various D3D11 APIs directly. Caller must not destroy returned device
  * object.
  *
- * Returns: (transfer none): the ID3D11Device handle or NULL if the device had been suspended
+ * Returns: (transfer none): the ID3D11Device handle
  *
  * Since: 1.22
  */
@@ -1224,7 +1224,7 @@ gst_d3d11_device_get_device_handle (GstD3D11Device * device)
 {
   g_return_val_if_fail (GST_IS_D3D11_DEVICE (device), NULL);
 
-  return G_UNLIKELY (device->priv->suspended) ? NULL : device->priv->device;
+  return device->priv->device;
 }
 
 /**
@@ -1244,7 +1244,7 @@ gst_d3d11_device_get_device_context_handle (GstD3D11Device * device)
 {
   g_return_val_if_fail (GST_IS_D3D11_DEVICE (device), NULL);
 
-  return G_UNLIKELY (device->priv->suspended) ? NULL : device->priv->device_context;
+  return device->priv->device_context;
 }
 
 /**
@@ -1263,7 +1263,7 @@ gst_d3d11_device_get_dxgi_factory_handle (GstD3D11Device * device)
 {
   g_return_val_if_fail (GST_IS_D3D11_DEVICE (device), NULL);
 
-  return G_UNLIKELY (device->priv->suspended) ? NULL : device->priv->factory;
+  return device->priv->factory;
 }
 
 /**
@@ -1287,8 +1287,6 @@ gst_d3d11_device_get_video_device_handle (GstD3D11Device * device)
 
   priv = device->priv;
   GstD3D11SRWLockGuard lk (&priv->resource_lock);
-  if (G_UNLIKELY (priv->suspended))
-    return NULL;
   if (!priv->video_device) {
     HRESULT hr;
     ID3D11VideoDevice *video_device = NULL;
@@ -1322,8 +1320,6 @@ gst_d3d11_device_get_video_context_handle (GstD3D11Device * device)
 
   priv = device->priv;
   GstD3D11SRWLockGuard lk (&priv->resource_lock);
-  if (G_UNLIKELY (priv->suspended))
-    return NULL;
   if (!priv->video_context) {
     HRESULT hr;
     ID3D11VideoContext *video_context = NULL;
@@ -1432,8 +1428,8 @@ gst_d3d11_device_mark_suspended (GstD3D11Device* device)
   if (!device->priv->suspended) {
     g_signal_emit (device, gst_d3d11_device_signals[SIGNAL_SUSPENDED], 0,
       NULL);
-    // TODO: will require massive modification
-    //device->priv->suspended = TRUE;
+    // TODO: return NULL from the gst_d3d11_device_get_* () if suspended.
+    device->priv->suspended = TRUE;
   }
 }
 
