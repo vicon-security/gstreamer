@@ -704,22 +704,25 @@ gst_d3d11_decoder_get_supported_decoder_profile (GstD3D11Device * device,
     return FALSE;
   }
 
-  available_profile_count = video_device->GetVideoDecoderProfileCount ();
+  {
+    GstD3D11DeviceLockGuard lk (device);
+    available_profile_count = video_device->GetVideoDecoderProfileCount ();
 
-  if (available_profile_count == 0) {
-    GST_INFO_OBJECT (device, "No available decoder profile");
-    return FALSE;
-  }
-
-  GST_DEBUG_OBJECT (device,
-      "Have %u available decoder profiles", available_profile_count);
-  guid_list = (GUID *) g_alloca (sizeof (GUID) * available_profile_count);
-
-  for (i = 0; i < available_profile_count; i++) {
-    hr = video_device->GetVideoDecoderProfile (i, &guid_list[i]);
-    if (!gst_d3d11_result (hr, device)) {
-      GST_WARNING_OBJECT (device, "Failed to get %d th decoder profile", i);
+    if (available_profile_count == 0) {
+      GST_INFO_OBJECT(device, "No available decoder profile");
       return FALSE;
+    }
+
+    GST_DEBUG_OBJECT(device,
+      "Have %u available decoder profiles", available_profile_count);
+    guid_list = (GUID*)g_alloca(sizeof(GUID) * available_profile_count);
+
+    for (i = 0; i < available_profile_count; i++) {
+      hr = video_device->GetVideoDecoderProfile (i, &guid_list[i]);
+      if (!gst_d3d11_result (hr, device)) {
+        GST_WARNING_OBJECT (device, "Failed to get %d th decoder profile", i);
+        return FALSE;
+      }
     }
   }
 
@@ -845,7 +848,10 @@ gst_d3d11_decoder_ensure_staging_texture (GstD3D11Decoder * self)
   desc.Usage = D3D11_USAGE_STAGING;
   desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 
+  gst_d3d11_device_lock (self->device);
   hr = device_handle->CreateTexture2D (&desc, nullptr, &self->staging);
+  gst_d3d11_device_unlock (self->device);
+
   if (!gst_d3d11_result (hr, self->device)) {
     GST_ERROR_OBJECT (self, "Couldn't create staging texture");
     return FALSE;
@@ -1145,6 +1151,7 @@ gst_d3d11_decoder_end_frame (GstD3D11Decoder * decoder)
   HRESULT hr;
   ID3D11VideoContext *video_context;
 
+  GstD3D11DeviceLockGuard lk (decoder->device);
   video_context = decoder->video_context;
   hr = video_context->DecoderEndFrame (decoder->decoder_handle);
 
@@ -1166,6 +1173,7 @@ gst_d3d11_decoder_get_decoder_buffer (GstD3D11Decoder * decoder,
   HRESULT hr;
   ID3D11VideoContext *video_context;
 
+  GstD3D11DeviceLockGuard lk (decoder->device);
   video_context = decoder->video_context;
   hr = video_context->GetDecoderBuffer (decoder->decoder_handle,
       type, &size, &decoder_buffer);
@@ -1189,6 +1197,7 @@ gst_d3d11_decoder_release_decoder_buffer (GstD3D11Decoder * decoder,
   HRESULT hr;
   ID3D11VideoContext *video_context;
 
+  GstD3D11DeviceLockGuard lk (decoder->device);
   video_context = decoder->video_context;
   hr = video_context->ReleaseDecoderBuffer (decoder->decoder_handle, type);
 
@@ -1208,6 +1217,7 @@ gst_d3d11_decoder_submit_decoder_buffers (GstD3D11Decoder * decoder,
   HRESULT hr;
   ID3D11VideoContext *video_context;
 
+  GstD3D11DeviceLockGuard lk (decoder->device);
   video_context = decoder->video_context;
   hr = video_context->SubmitDecoderBuffers (decoder->decoder_handle,
       buffer_count, buffers);
@@ -1448,6 +1458,8 @@ gst_d3d11_decoder_get_output_view_from_buffer (GstD3D11Decoder * decoder,
     GST_WARNING_OBJECT (decoder, "Not a d3d11 memory");
     return NULL;
   }
+
+  GstD3D11DeviceLockGuard lk (decoder->device);
 
   dmem = (GstD3D11Memory *) mem;
   view = gst_d3d11_memory_get_decoder_output_view (dmem, decoder->video_device,
@@ -2144,7 +2156,7 @@ gst_d3d11_decoder_supports_format (GstD3D11Device * device,
   video_device = gst_d3d11_device_get_video_device_handle (device);
   if (!video_device)
     return FALSE;
-
+  GstD3D11DeviceLockGuard lk (device);
   hr = video_device->CheckVideoDecoderFormat (decoder_profile, format,
       &can_support);
   if (!gst_d3d11_result (hr, device) || !can_support) {
@@ -2181,6 +2193,7 @@ gst_d3d11_decoder_supports_resolution (GstD3D11Device * device,
   desc.OutputFormat = format;
   desc.Guid = *decoder_profile;
 
+  GstD3D11DeviceLockGuard lk (device);
   hr = video_device->GetVideoDecoderConfigCount (&desc, &config_count);
   if (!gst_d3d11_result (hr, device) || config_count == 0) {
     GST_DEBUG_OBJECT (device, "Could not get decoder config count, hr: 0x%x",
