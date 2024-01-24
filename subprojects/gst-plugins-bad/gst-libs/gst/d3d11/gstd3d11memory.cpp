@@ -375,6 +375,7 @@ gst_d3d11_allocate_staging_texture (GstD3D11Device * device,
   desc.Usage = D3D11_USAGE_STAGING;
   desc.CPUAccessFlags = (D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE);
 
+  GstD3D11DeviceLockGuard lk (device);
   hr = device_handle->CreateTexture2D (&desc, NULL, &texture);
   if (!gst_d3d11_result (hr, device)) {
     GST_ERROR_OBJECT (device, "Failed to create texture");
@@ -790,6 +791,7 @@ create_shader_resource_views (GstD3D11Memory * mem)
     resource_desc.Texture2D.MipLevels = 1;
 
     for (i = 0; i < num_views; i++) {
+      GstD3D11DeviceLockGuard lk (mem->device);
       resource_desc.Format = formats[i];
       hr = device_handle->CreateShaderResourceView (priv->texture,
           &resource_desc, &priv->shader_resource_view[i]);
@@ -921,7 +923,7 @@ create_render_target_views (GstD3D11Memory * mem)
 
     for (i = 0; i < num_views; i++) {
       render_desc.Format = formats[i];
-
+      GstD3D11DeviceLockGuard lk (mem->device);
       hr = device_handle->CreateRenderTargetView (priv->texture, &render_desc,
           &priv->render_target_view[i]);
       if (!gst_d3d11_result (hr, mem->device)) {
@@ -1060,7 +1062,7 @@ gst_d3d11_memory_ensure_decoder_output_view (GstD3D11Memory * mem,
   desc.DecodeProfile = *decoder_profile;
   desc.ViewDimension = D3D11_VDOV_DIMENSION_TEXTURE2D;
   desc.Texture2D.ArraySlice = dmem_priv->subresource_index;
-
+  GstD3D11DeviceLockGuard lkd (mem->device);
   hr = video_device->CreateVideoDecoderOutputView (dmem_priv->texture, &desc,
       &dmem_priv->decoder_output_view);
   if (!gst_d3d11_result (hr, mem->device)) {
@@ -1153,7 +1155,7 @@ gst_d3d11_memory_ensure_processor_input_view (GstD3D11Memory * mem,
   desc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
   desc.Texture2D.MipSlice = 0;
   desc.Texture2D.ArraySlice = dmem_priv->subresource_index;
-
+  GstD3D11DeviceLockGuard lkd (mem->device);
   hr = video_device->CreateVideoProcessorInputView (dmem_priv->texture,
       enumerator, &desc, &dmem_priv->processor_input_view);
   if (!gst_d3d11_result (hr, mem->device)) {
@@ -1229,7 +1231,7 @@ gst_d3d11_memory_ensure_processor_output_view (GstD3D11Memory * mem,
 
   desc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
   desc.Texture2D.MipSlice = 0;
-
+  GstD3D11DeviceLockGuard lkd (mem->device);
   hr = video_device->CreateVideoProcessorOutputView (priv->texture,
       enumerator, &desc, &priv->processor_output_view);
   if (!gst_d3d11_result (hr, mem->device)) {
@@ -1459,22 +1461,24 @@ gst_d3d11_allocator_free (GstAllocator * allocator, GstMemory * mem)
 
   GST_LOG_OBJECT (allocator, "Free memory %p", mem);
 
-  for (i = 0; i < GST_VIDEO_MAX_PLANES; i++) {
-    GST_D3D11_CLEAR_COM (dmem_priv->render_target_view[i]);
-    GST_D3D11_CLEAR_COM (dmem_priv->shader_resource_view[i]);
+  {
+    GstD3D11DeviceLockGuard lk (dmem->device);
+    for (i = 0; i < GST_VIDEO_MAX_PLANES; i++) {
+      GST_D3D11_CLEAR_COM (dmem_priv->render_target_view[i]);
+      GST_D3D11_CLEAR_COM (dmem_priv->shader_resource_view[i]);
+    }
+
+    GST_D3D11_CLEAR_COM (dmem_priv->decoder_output_view);
+    GST_D3D11_CLEAR_COM (dmem_priv->processor_input_view);
+    GST_D3D11_CLEAR_COM (dmem_priv->processor_output_view);
+    GST_D3D11_CLEAR_COM (dmem_priv->dxgi_surface);
+    GST_D3D11_CLEAR_COM (dmem_priv->d2d1_render_target);
+    GST_D3D11_CLEAR_COM (dmem_priv->texture);
+    GST_D3D11_CLEAR_COM (dmem_priv->staging);
+    GST_D3D11_CLEAR_COM (dmem_priv->buffer);
+
+    GST_D3D11_CLEAR_COM (dmem_priv->decoder_handle);
   }
-
-  GST_D3D11_CLEAR_COM (dmem_priv->decoder_output_view);
-  GST_D3D11_CLEAR_COM (dmem_priv->processor_input_view);
-  GST_D3D11_CLEAR_COM (dmem_priv->processor_output_view);
-  GST_D3D11_CLEAR_COM (dmem_priv->dxgi_surface);
-  GST_D3D11_CLEAR_COM (dmem_priv->d2d1_render_target);
-  GST_D3D11_CLEAR_COM (dmem_priv->texture);
-  GST_D3D11_CLEAR_COM (dmem_priv->staging);
-  GST_D3D11_CLEAR_COM (dmem_priv->buffer);
-
-  GST_D3D11_CLEAR_COM (dmem_priv->decoder_handle);
-
   gst_clear_object (&dmem->device);
 
   if (dmem_priv->notify)
@@ -1542,6 +1546,7 @@ gst_d3d11_allocator_alloc_internal (GstD3D11Allocator * self,
   device_handle = gst_d3d11_device_get_device_handle (device);
 
   if (!texture) {
+    GstD3D11DeviceLockGuard lkd (device);
     hr = device_handle->CreateTexture2D (desc, nullptr, &texture);
     if (!gst_d3d11_result (hr, device)) {
       GST_ERROR_OBJECT (self, "Couldn't create texture");
@@ -1663,12 +1668,14 @@ gst_d3d11_allocator_alloc_buffer (GstD3D11Allocator * allocator,
     return nullptr;
   }
 
-  device_handle = gst_d3d11_device_get_device_handle (device);
-
-  hr = device_handle->CreateBuffer (desc, nullptr, &buffer);
-  if (!gst_d3d11_result (hr, device)) {
-    GST_ERROR_OBJECT (allocator, "Couldn't create buffer");
-    return nullptr;
+  {
+    device_handle = gst_d3d11_device_get_device_handle (device);
+    GstD3D11DeviceLockGuard lk (device);
+    hr = device_handle->CreateBuffer (desc, nullptr, &buffer);
+    if (!gst_d3d11_result (hr, device)) {
+      GST_ERROR_OBJECT (allocator, "Couldn't create buffer");
+      return nullptr;
+    }
   }
 
   mem = g_new0 (GstD3D11Memory, 1);
@@ -1916,6 +1923,7 @@ gst_d3d11_pool_allocator_start (GstD3D11PoolAllocator * self)
   device_handle = gst_d3d11_device_get_device_handle (self->device);
 
   if (!priv->texture) {
+    GstD3D11DeviceLockGuard lk(self->device);
     hr = device_handle->CreateTexture2D (&priv->desc, NULL, &priv->texture);
     if (!gst_d3d11_result (hr, self->device)) {
       GST_ERROR_OBJECT (self, "Failed to allocate texture");
