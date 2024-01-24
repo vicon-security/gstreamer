@@ -463,6 +463,7 @@ check_format_support (GstD3D11Device * self, DXGI_FORMAT format)
   HRESULT hr;
   UINT format_support;
 
+  GstD3D11DeviceLockGuard lk (self);
   hr = handle->CheckFormatSupport (format, &format_support);
   if (FAILED (hr) || format_support == 0)
     return 0;
@@ -1491,14 +1492,17 @@ gst_d3d11_device_create_fence (GstD3D11Device * device)
 
   g_return_val_if_fail (GST_IS_D3D11_DEVICE (device), nullptr);
 
-  priv = device->priv;
+  {
+    GstD3D11DeviceLockGuard lk (device);
+    priv = device->priv;
 
-  if (priv->device5 && priv->device_context4) {
-    hr = priv->device5->CreateFence (0, D3D11_FENCE_FLAG_NONE,
+    if (priv->device5 && priv->device_context4) {
+      hr = priv->device5->CreateFence (0, D3D11_FENCE_FLAG_NONE,
         IID_PPV_ARGS (&fence));
 
-    if (!gst_d3d11_result (hr, device))
-      GST_WARNING_OBJECT (device, "Failed to create fence object");
+      if (!gst_d3d11_result (hr, device))
+        GST_WARNING_OBJECT (device, "Failed to create fence object");
+    }
   }
 
   self = g_new0 (GstD3D11Fence, 1);
@@ -1551,6 +1555,7 @@ gst_d3d11_fence_signal (GstD3D11Fence * fence)
     GST_LOG_OBJECT (device, "Signals with fence value %" G_GUINT64_FORMAT,
         priv->fence_value);
 
+    GstD3D11DeviceLockGuard lk (device);
     hr = device_priv->device_context4->Signal (priv->fence, priv->fence_value);
     if (!gst_d3d11_result (hr, device)) {
       GST_ERROR_OBJECT (device, "Failed to signal fence value %"
@@ -1567,6 +1572,7 @@ gst_d3d11_fence_signal (GstD3D11Fence * fence)
 
     GST_LOG_OBJECT (device, "Creating query object");
 
+    GstD3D11DeviceLockGuard lk (device);
     hr = device_priv->device->CreateQuery (&desc, &priv->query);
     if (!gst_d3d11_result (hr, device)) {
       GST_ERROR_OBJECT (device, "Failed to create query object");
@@ -1627,9 +1633,12 @@ gst_d3d11_fence_wait (GstD3D11Fence * fence)
     GST_LOG_OBJECT (device, "Waiting fence value %" G_GUINT64_FORMAT,
         priv->fence_value);
 
+    gst_d3d11_device_lock (device);
     if (fence->priv->fence->GetCompletedValue () < fence->priv->fence_value) {
       hr = fence->priv->fence->SetEventOnCompletion (fence->priv->fence_value,
           fence->priv->event_handle);
+      gst_d3d11_device_unlock (device);
+
       if (!gst_d3d11_result (hr, device)) {
         GST_WARNING_OBJECT (device, "Failed set event handle");
         return FALSE;
@@ -1642,6 +1651,8 @@ gst_d3d11_fence_wait (GstD3D11Fence * fence)
             "Failed to wait object, ret 0x%x", (guint) ret);
         return FALSE;
       }
+    } else {
+      gst_d3d11_device_unlock (device);
     }
   } else {
     LONGLONG timeout;
@@ -1655,8 +1666,10 @@ gst_d3d11_fence_wait (GstD3D11Fence * fence)
     GST_LOG_OBJECT (device, "Waiting event");
 
     while (now.QuadPart < timeout && !sync_done) {
+      gst_d3d11_device_lock (device);
       hr = device_priv->device_context->GetData (priv->query,
           &sync_done, sizeof (BOOL), 0);
+      gst_d3d11_device_unlock (device);
       if (FAILED (hr)) {
         GST_WARNING_OBJECT (device, "Failed to get event data");
         return FALSE;
