@@ -1046,6 +1046,7 @@ gst_d3d11_memory_ensure_decoder_output_view (GstD3D11Memory * mem,
 
   GstD3D11SRWLockGuard lk (GST_D3D11_MEMORY_GET_LOCK (mem));
   if (dmem_priv->decoder_output_view) {
+    GstD3D11DeviceLockGuard lkd (mem->device);
     dmem_priv->decoder_output_view->GetDesc (&desc);
     if (IsEqualGUID (desc.DecodeProfile, *decoder_profile) &&
         dmem_priv->decoder_handle == decoder) {
