@@ -301,7 +301,10 @@ gst_d3d11_d2d1_decide_allocation(GstBaseTransform* trans, GstQuery* query)
 
     device_handle = gst_d3d11_device_get_device_handle(filter->device);
 
+    gst_d3d11_device_lock (filter->device);
     hr = device_handle->CheckFormatSupport(dxgi_format, &supported);
+    gst_d3d11_device_lock (filter->device);
+
     if (gst_d3d11_result(hr, filter->device)) {
         if ((supported & D3D11_FORMAT_SUPPORT_SHADER_SAMPLE) !=
             D3D11_FORMAT_SUPPORT_SHADER_SAMPLE) {
