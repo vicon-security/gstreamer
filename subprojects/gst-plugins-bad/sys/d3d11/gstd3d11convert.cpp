@@ -1248,7 +1248,11 @@ gst_d3d11_base_convert_propose_allocation (GstBaseTransform * trans,
   }
 
   device_handle = gst_d3d11_device_get_device_handle (filter->device);
+
+  gst_d3d11_device_lock (filter->device);
   hr = device_handle->CheckFormatSupport (dxgi_format, &supported);
+  gst_d3d11_device_unlock (filter->device);
+
   if (gst_d3d11_result (hr, filter->device) &&
       (supported & D3D11_FORMAT_SUPPORT_RENDER_TARGET) ==
       D3D11_FORMAT_SUPPORT_RENDER_TARGET) {
@@ -1370,7 +1374,9 @@ gst_d3d11_base_convert_decide_allocation (GstBaseTransform * trans,
   }
 
   device_handle = gst_d3d11_device_get_device_handle (filter->device);
+  gst_d3d11_device_lock (filter->device);
   hr = device_handle->CheckFormatSupport (dxgi_format, &supported);
+  gst_d3d11_device_unlock (filter->device);
   if (gst_d3d11_result (hr, filter->device) &&
       (supported & D3D11_FORMAT_SUPPORT_SHADER_SAMPLE) ==
       D3D11_FORMAT_SUPPORT_SHADER_SAMPLE) {
