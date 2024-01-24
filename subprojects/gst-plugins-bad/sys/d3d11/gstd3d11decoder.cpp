@@ -1459,8 +1459,6 @@ gst_d3d11_decoder_get_output_view_from_buffer (GstD3D11Decoder * decoder,
     return NULL;
   }
 
-  GstD3D11DeviceLockGuard lk (decoder->device);
-
   dmem = (GstD3D11Memory *) mem;
   view = gst_d3d11_memory_get_decoder_output_view (dmem, decoder->video_device,
       decoder->decoder_handle, &decoder->decoder_profile);
