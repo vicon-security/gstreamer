@@ -321,6 +321,7 @@ gst_d3d11_decoder_constructed (GObject * object)
     return;
   }
 
+  GstD3D11DeviceLockGuard lk(self->device);
   video_device = gst_d3d11_device_get_video_device_handle (self->device);
   if (!video_device) {
     GST_WARNING_OBJECT (self, "ID3D11VideoDevice is not available");
