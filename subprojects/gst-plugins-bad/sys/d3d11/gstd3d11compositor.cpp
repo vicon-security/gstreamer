@@ -60,6 +60,7 @@ typedef enum
   GST_D3D11_COMPOSITOR_BACKGROUND_BLACK,
   GST_D3D11_COMPOSITOR_BACKGROUND_WHITE,
   GST_D3D11_COMPOSITOR_BACKGROUND_TRANSPARENT,
+  GST_D3D11_COMPOSITOR_BACKGROUND_UNDEFINED,
 } GstD3D11CompositorBackground;
 
 #define GST_TYPE_D3D11_COMPOSITOR_BACKGROUND (gst_d3d11_compositor_background_get_type())
@@ -74,6 +75,8 @@ gst_d3d11_compositor_background_get_type (void)
     {GST_D3D11_COMPOSITOR_BACKGROUND_WHITE, "White", "white"},
     {GST_D3D11_COMPOSITOR_BACKGROUND_TRANSPARENT,
         "Transparent Background to enable further compositing", "transparent"},
+    {GST_D3D11_COMPOSITOR_BACKGROUND_UNDEFINED,
+       "Don't draw any to enhance the performance", "undefined"},
     {0, nullptr, nullptr},
   };
 
@@ -2192,9 +2195,8 @@ gst_d3d11_compositor_aggregate_frames (GstVideoAggregator * vagg,
   GList *iter;
   GstBuffer *target_buf = outbuf;
   GstFlowReturn ret = GST_FLOW_OK;
-  ID3D11RenderTargetView *rtv[GST_VIDEO_MAX_PLANES] = { nullptr, };
   GstVideoFrame target_frame;
-  guint num_rtv = GST_VIDEO_INFO_N_PLANES (&vagg->info);
+  
   GstD3D11DeviceLockGuard lk (self->device);
 
   if (!self->downstream_supports_d3d11)
@@ -2206,16 +2208,21 @@ gst_d3d11_compositor_aggregate_frames (GstVideoAggregator * vagg,
     return GST_FLOW_ERROR;
   }
 
-  if (!gst_d3d11_buffer_get_render_target_view (target_buf, rtv)) {
-    GST_ERROR_OBJECT (self, "RTV is unavailable");
-    gst_video_frame_unmap (&target_frame);
-    return GST_FLOW_ERROR;
-  }
+  if (self->background != GST_D3D11_COMPOSITOR_BACKGROUND_UNDEFINED) {
+    guint num_rtv = GST_VIDEO_INFO_N_PLANES(&vagg->info);
+    ID3D11RenderTargetView* rtv[GST_VIDEO_MAX_PLANES] = { nullptr, };
 
-  if (!gst_d3d11_compositor_draw_background (self, rtv, num_rtv)) {
-    GST_ERROR_OBJECT (self, "Couldn't draw background");
-    gst_video_frame_unmap (&target_frame);
-    return GST_FLOW_ERROR;
+    if (!gst_d3d11_buffer_get_render_target_view(target_buf, rtv)) {
+      GST_ERROR_OBJECT(self, "RTV is unavailable");
+      gst_video_frame_unmap(&target_frame);
+      return GST_FLOW_ERROR;
+    }
+
+    if (!gst_d3d11_compositor_draw_background(self, rtv, num_rtv)) {
+      GST_ERROR_OBJECT(self, "Couldn't draw background");
+      gst_video_frame_unmap(&target_frame);
+      return GST_FLOW_ERROR;
+    }
   }
 
   gst_video_frame_unmap (&target_frame);
