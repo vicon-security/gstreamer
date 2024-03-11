@@ -1371,6 +1371,9 @@ gst_d3d11_video_sink_prepare (GstBaseSink * sink, GstBuffer * buffer)
 
     if (ret != GST_FLOW_OK)
       return ret;
+
+    GstD3D11DeviceLockGuard lk (self->device);
+    gst_d3d11_device_fence_simple (self->device);
   }
 
   if (!gst_is_d3d11_buffer (buffer)) {
