@@ -1750,3 +1750,19 @@ gst_d3d11_device_get_d2d1_factory (GstD3D11Device * device)
 
   return priv->d2d1_factory;
 }
+
+void
+gst_d3d11_device_fence_simple (GstD3D11Device * device)
+{
+  GstD3D11Fence * fence;
+
+  GstD3D11DeviceLockGuard lk (device);
+  fence = gst_d3d11_device_create_fence(device);
+  if (fence == nullptr
+     || !gst_d3d11_fence_signal(fence)
+     || !gst_d3d11_fence_wait(fence)) {
+    g_critical("Couldn't sync GPU operation on device %s",
+      GST_OBJECT_NAME(device));
+  }
+  gst_clear_d3d11_fence(&fence);
+}

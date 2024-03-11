@@ -170,5 +170,8 @@ gst_clear_d3d11_fence (GstD3D11Fence ** fence)
   }
 }
 
+GST_D3D11_API void
+gst_d3d11_device_fence_simple (GstD3D11Device * device);
+
 G_END_DECLS
 
