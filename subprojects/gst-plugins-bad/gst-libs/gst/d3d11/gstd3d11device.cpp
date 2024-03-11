@@ -731,7 +731,7 @@ gst_d3d11_device_dispose (GObject * object)
   GstD3D11DevicePrivate *priv = self->priv;
 
   GST_LOG_OBJECT (self, "dispose");
-
+  gst_d3d11_device_fence_simple (self);
   GST_D3D11_CLEAR_COM (priv->device5);
   GST_D3D11_CLEAR_COM (priv->device_context4);
   GST_D3D11_CLEAR_COM (priv->video_device);
