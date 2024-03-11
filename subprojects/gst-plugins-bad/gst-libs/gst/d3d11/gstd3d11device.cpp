@@ -1563,7 +1563,8 @@ gst_d3d11_fence_signal (GstD3D11Fence * fence)
   priv->synced = FALSE;
 
   if (priv->fence) {
-    priv->fence_value++;
+    static gssize fv = 1;
+    priv->fence_value = g_atomic_pointer_add(&fv, 1);
 
     GST_LOG_OBJECT (device, "Signals with fence value %" G_GUINT64_FORMAT,
         priv->fence_value);
