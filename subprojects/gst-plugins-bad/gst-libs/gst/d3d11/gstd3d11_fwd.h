@@ -30,6 +30,7 @@
 
 #include <d3d11.h>
 #include <dxgi.h>
+#include <d2d1.h>
 
 G_BEGIN_DECLS
 

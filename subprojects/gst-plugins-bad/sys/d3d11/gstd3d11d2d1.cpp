@@ -60,7 +60,6 @@
 #endif
 
 #include <gst/gst.h>
-#include <d2d1.h>
 #include "gstd3d11d2d1.h"
 /* Filter signals and args */
 enum
@@ -176,19 +175,13 @@ gst_d3d11_d2d1_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
 
   dmem = GST_D3D11_MEMORY_CAST (mem);
   GstD3D11DeviceLockGuard lk (filter->device);
-  static ID2D1Factory* direct2DFactory;
+  ID2D1Factory* direct2DFactory = gst_d3d11_device_get_d2d1_factory (filter->device);
   if (!direct2DFactory) {
-    hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED,
-			   &direct2DFactory);
-    
-    if (!gst_d3d11_result(hr, filter->device)) {
-      GST_ERROR_OBJECT (filter,
-	  "Could not create ID2D1Factory, hr: 0x%x", (guint)hr);
-      return GST_FLOW_ERROR;
-    }
+    GST_ERROR_OBJECT (filter, "Could not get ID2D1Factory");
+    return GST_FLOW_ERROR;
   }
 
-  render_target = gst_d3d11_memory_get_d2d1_render_target(dmem, direct2DFactory);
+  render_target = gst_d3d11_memory_get_d2d1_render_target (dmem, direct2DFactory);
   if (render_target == NULL) {
     GST_ERROR_OBJECT(filter,
 	"Could not get ID2D1RenderTarget from d3d11memory");
