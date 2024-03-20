@@ -911,10 +911,6 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     g_rec_mutex_unlock (&self->hwnds_lock);
 
     switch (uMsg) {
-      case WM_SIZE:
-        /* We handled this event already */
-        gst_object_unref (self);
-        return 0;
       case WM_NCHITTEST:
         /* To passthrough mouse event if external window is used.
          * Only hit-test succeeded window can receive/handle some mouse events
@@ -925,6 +921,16 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
           return (LRESULT) HTTRANSPARENT;
         }
         break;
+      case WM_NCPAINT:
+      case WM_ERASEBKGND:
+      {
+        LRESULT ret;
+        gst_d3d11_device_lock (GST_D3D11_WINDOW(self)->device);
+        ret = DefWindowProcA(hWnd, uMsg, wParam, lParam);
+        gst_d3d11_device_unlock (GST_D3D11_WINDOW(self)->device);
+        gst_object_unref(self);
+        return ret;
+      }
       default:
         break;
     }
