@@ -875,6 +875,8 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
   GstD3D11WindowWin32 *self;
 
+  GST_DEBUG ("(%d:), uMsg = 0x%x, wParam = %p, lParam = %p", hWnd, uMsg, wParam, lParam);
+
   if (uMsg == WM_GST_D3D11_DESTROY_INTERNAL_WINDOW) {
     GST_INFO ("Handle destroy window message");
     gst_d3d11_window_win32_destroy_internal_window (hWnd);
@@ -939,6 +941,7 @@ sub_class_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
       (WNDPROC) GetPropA (hWnd, EXTERNAL_PROC_PROP_NAME);
   GstD3D11WindowWin32 *self = gst_d3d11_window_win32_hwnd_get_instance (hWnd);
 
+  GST_DEBUG ("(%d:), uMsg = 0x%x, wParam = %p, lParam = %p", hWnd, uMsg, wParam, lParam);
   if (self == NULL || self->flushing) {
     GST_DEBUG ("No object attached to the window, chain up to default");
     gst_clear_object (&self);
