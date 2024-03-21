@@ -32,6 +32,7 @@
 
 #include <windows.h>
 #include <versionhelpers.h>
+#include <d2d1_1.h>
 
 /**
  * SECTION:gstd3d11device
@@ -139,6 +140,7 @@ struct _GstD3D11DevicePrivate
 #endif
 
   ID2D1Factory *d2d1_factory;
+  ID2D1Multithread *d2d1_multithread;
 };
 
 static void
@@ -763,6 +765,7 @@ gst_d3d11_device_dispose (GObject * object)
   GST_D3D11_CLEAR_COM (priv->dxgi_info_queue);
 #endif
 
+  GST_D3D11_CLEAR_COM (priv->d2d1_multithread);
   GST_D3D11_CLEAR_COM (priv->d2d1_factory);
   G_OBJECT_CLASS (parent_class)->dispose (object);
 }
@@ -1357,6 +1360,12 @@ gst_d3d11_device_lock (GstD3D11Device * device)
   GST_TRACE_OBJECT (device, "device locking");
   EnterCriticalSection (&priv->extern_lock);
   GST_TRACE_OBJECT (device, "device locked");
+
+  if (priv->d2d1_multithread) {
+    GST_TRACE_OBJECT (device, "d2d1 locking");
+    priv->d2d1_multithread->Enter ();
+    GST_TRACE_OBJECT (device, "d2d1 locked");
+  }
 }
 
 /**
@@ -1379,6 +1388,11 @@ gst_d3d11_device_unlock (GstD3D11Device * device)
 
   LeaveCriticalSection (&priv->extern_lock);
   GST_TRACE_OBJECT (device, "device unlocked");
+
+  if (priv->d2d1_multithread) {
+    priv->d2d1_multithread->Leave ();
+    GST_TRACE_OBJECT(device, "d2d1 unlocked");
+  }
 }
 
 /**
@@ -1726,9 +1740,12 @@ gst_d3d11_device_get_d2d1_factory (GstD3D11Device * device)
     hr = D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED,
         &priv->d2d1_factory);
     if (!gst_d3d11_result(hr, device)) {
-      GST_ERROR_OBJECT (device,
-	  "Could not create ID2D1Factory, hr: 0x%x", (guint)hr);
+      GST_ERROR_OBJECT (device, "Could not create ID2D1Factory, hr: 0x%x", (guint)hr);
+      return nullptr;
     }
+
+    priv->d2d1_factory->QueryInterface (IID_PPV_ARGS(&priv->d2d1_multithread));
+    g_warn_if_fail (priv->d2d1_multithread != nullptr);
   }
 
   return priv->d2d1_factory;
