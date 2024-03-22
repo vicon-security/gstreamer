@@ -190,7 +190,7 @@ gst_d3d11_d2d1_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
 
   GST_DEBUG_OBJECT(filter, "Emit signal to the user");
   g_signal_emit(filter, gst_d3d11_d2d1_signals[SIGNAL_DRAW], 0, render_target, GST_BUFFER_PTS (buf));
-
+  gst_d3d11_device_fence_simple(filter->device);
   return GST_FLOW_OK;
 }
 
