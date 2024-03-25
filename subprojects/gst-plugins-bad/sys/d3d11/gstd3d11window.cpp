@@ -940,7 +940,7 @@ gst_d3d111_window_present (GstD3D11Window * self, GstBuffer * buffer,
   }
 
   self->first_present = FALSE;
-
+  gst_d3d11_device_fence_simple (self->device);
   return ret;
 }
 
