@@ -580,10 +580,12 @@ gst_d3d11_memory_update_size (GstMemory * mem)
   if (!gst_d3d11_dxgi_format_get_size (desc->Format, desc->Width, desc->Height,
           priv->map.RowPitch, offset, stride, &size)) {
     GST_ERROR_OBJECT (mem->allocator, "Couldn't calculate memory size");
+    gst_d3d11_device_fence_simple(dmem->device);
     GST_D3D11_CLEAR_COM (priv->staging);
     return FALSE;
   }
 
+  gst_d3d11_device_fence_simple(dmem->device);
   GST_D3D11_CLEAR_COM (priv->staging);
   mem->maxsize = mem->size = size;
 
@@ -1467,6 +1469,7 @@ gst_d3d11_allocator_free (GstAllocator * allocator, GstMemory * mem)
 
   {
     GstD3D11DeviceLockGuard lk (dmem->device);
+    gst_d3d11_device_fence_simple (dmem->device);
     for (i = 0; i < GST_VIDEO_MAX_PLANES; i++) {
       GST_D3D11_CLEAR_COM (dmem_priv->render_target_view[i]);
       GST_D3D11_CLEAR_COM (dmem_priv->shader_resource_view[i]);
@@ -1891,6 +1894,7 @@ gst_d3d11_pool_allocator_finalize (GObject * object)
 
   {
     GstD3D11DeviceLockGuard lk(self->device);
+    gst_d3d11_device_fence_simple(self->device);
     GST_D3D11_CLEAR_COM(priv->texture);
   }
   gst_clear_object (&self->device);

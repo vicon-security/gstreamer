@@ -418,6 +418,7 @@ gst_d3d11_decoder_dispose (GObject * obj)
 
   {
     GstD3D11DeviceLockGuard lk(self->device);
+    gst_d3d11_device_fence_simple(self->device);
     gst_d3d11_decoder_reset(self);
 
     GST_D3D11_CLEAR_COM(self->video_device);

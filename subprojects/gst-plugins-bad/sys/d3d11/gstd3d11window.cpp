@@ -275,6 +275,7 @@ gst_d3d11_window_dispose (GObject * object)
 
   {
     GstD3D11DeviceLockGuard lk (self->device);
+    gst_d3d11_device_fence_simple(self->device);
     gst_clear_buffer (&self->backbuffer);
     GST_D3D11_CLEAR_COM (self->swap_chain);
 

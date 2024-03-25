@@ -840,7 +840,7 @@ gst_d3d11_converter_dispose (GObject * object)
   
   {
     GstD3D11DeviceLockGuard lk (self->device);
-
+    gst_d3d11_device_fence_simple(self->device);
     GST_D3D11_CLEAR_COM (priv->vertex_buffer);
     GST_D3D11_CLEAR_COM (priv->index_buffer);
     GST_D3D11_CLEAR_COM (priv->const_buffer);
