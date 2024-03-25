@@ -919,14 +919,6 @@ window_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         break;
       case WM_NCPAINT:
       case WM_ERASEBKGND:
-      {
-        LRESULT ret;
-        gst_d3d11_device_lock (GST_D3D11_WINDOW(self)->device);
-        ret = DefWindowProcA(hWnd, uMsg, wParam, lParam);
-        gst_d3d11_device_unlock (GST_D3D11_WINDOW(self)->device);
-        gst_object_unref(self);
-        return ret;
-      }
       default:
         break;
     }
