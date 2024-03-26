@@ -155,7 +155,7 @@ gst_d3d11_d2d1_class_init (Gstd3d11d2d1Class * klass)
   gst_d3d11_d2d1_signals[SIGNAL_DRAW] =
       g_signal_new("draw", G_TYPE_FROM_CLASS(klass),
           G_SIGNAL_RUN_FIRST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2,
-          G_TYPE_POINTER, G_TYPE_UINT64);
+          G_TYPE_POINTER, GST_TYPE_BUFFER);
 }
 
 static GstFlowReturn
@@ -189,8 +189,7 @@ gst_d3d11_d2d1_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   }
 
   GST_DEBUG_OBJECT(filter, "Emit signal to the user");
-  g_signal_emit(filter, gst_d3d11_d2d1_signals[SIGNAL_DRAW], 0, render_target, GST_BUFFER_PTS (buf));
-
+  g_signal_emit(filter, gst_d3d11_d2d1_signals[SIGNAL_DRAW], 0, render_target, buf);
   return GST_FLOW_OK;
 }
 
