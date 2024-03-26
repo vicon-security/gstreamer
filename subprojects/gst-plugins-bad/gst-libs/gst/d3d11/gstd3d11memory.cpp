@@ -340,6 +340,7 @@ struct _GstD3D11MemoryPrivate
 
   IDXGISurface* dxgi_surface;
   ID2D1RenderTarget* d2d1_render_target;
+  GHashTable *d2d1_rt_resources_cache;
 };
 
 static inline D3D11_MAP
@@ -1337,6 +1338,27 @@ ID2D1RenderTarget* gst_d3d11_memory_get_d2d1_render_target (GstD3D11Memory* mem,
     return render_target;
 }
 
+GHashTable *
+gst_d3d11_memory_get_d2d1_brushes_cache (GstMemory* mem)
+{
+  GstD3D11MemoryPrivate *priv;
+  g_return_val_if_fail (gst_is_d3d11_memory (mem), NULL);
+  priv = GST_D3D11_MEMORY_CAST (mem)->priv;  
+  g_return_val_if_fail (priv->d2d1_render_target, NULL);
+
+  if (!priv->d2d1_rt_resources_cache) {
+    auto free_com = [] (gpointer com)
+    {
+      ((IUnknown *)com)->Release ();
+    };
+    
+    priv->d2d1_rt_resources_cache = g_hash_table_new_full (g_str_hash,
+        g_str_equal, g_free, free_com);
+  }
+
+  return priv->d2d1_rt_resources_cache;
+}
+
 /* GstD3D11Allocator */
 struct _GstD3D11AllocatorPrivate
 {
@@ -1478,6 +1500,9 @@ gst_d3d11_allocator_free (GstAllocator * allocator, GstMemory * mem)
     GST_D3D11_CLEAR_COM (dmem_priv->decoder_output_view);
     GST_D3D11_CLEAR_COM (dmem_priv->processor_input_view);
     GST_D3D11_CLEAR_COM (dmem_priv->processor_output_view);
+
+    if (dmem_priv->d2d1_rt_resources_cache)
+      g_hash_table_unref (dmem_priv->d2d1_rt_resources_cache);
     GST_D3D11_CLEAR_COM (dmem_priv->dxgi_surface);
     GST_D3D11_CLEAR_COM (dmem_priv->d2d1_render_target);
     GST_D3D11_CLEAR_COM (dmem_priv->texture);
