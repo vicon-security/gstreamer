@@ -174,6 +174,7 @@ gst_d3d11_d2d1_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   }
 
   dmem = GST_D3D11_MEMORY_CAST (mem);
+  g_assert (dmem->device == filter->device);
   GstD3D11DeviceLockGuard lk (filter->device);
   ID2D1Factory* direct2DFactory = gst_d3d11_device_get_d2d1_factory (filter->device);
   if (!direct2DFactory) {
