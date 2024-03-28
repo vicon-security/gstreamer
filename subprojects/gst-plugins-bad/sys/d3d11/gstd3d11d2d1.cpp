@@ -176,9 +176,13 @@ gst_d3d11_d2d1_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   dmem = GST_D3D11_MEMORY_CAST (mem);
   g_assert (dmem->device == filter->device);
   GstD3D11DeviceLockGuard lk (filter->device);
+  G_LOCK_DEFINE_STATIC (global_d2d1_lock);
+  // Don't allow any d2d1 calls to collide, even for different D3D11Device objects
+  G_LOCK (global_d2d1_lock);
   ID2D1Factory* direct2DFactory = gst_d3d11_device_get_d2d1_factory (filter->device);
   if (!direct2DFactory) {
     GST_ERROR_OBJECT (filter, "Could not get ID2D1Factory");
+    G_UNLOCK (global_d2d1_lock);
     return GST_FLOW_ERROR;
   }
 
@@ -186,11 +190,14 @@ gst_d3d11_d2d1_transform_ip (GstBaseTransform * trans, GstBuffer * buf)
   if (render_target == NULL) {
     GST_ERROR_OBJECT(filter,
 	"Could not get ID2D1RenderTarget from d3d11memory");
+    G_UNLOCK (global_d2d1_lock);
     return GST_FLOW_ERROR;
   }
 
   GST_DEBUG_OBJECT(filter, "Emit signal to the user");
+
   g_signal_emit(filter, gst_d3d11_d2d1_signals[SIGNAL_DRAW], 0, render_target, buf);
+  G_UNLOCK (global_d2d1_lock);
   gst_d3d11_device_fence_simple(filter->device);
   return GST_FLOW_OK;
 }
