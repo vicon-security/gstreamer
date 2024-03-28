@@ -212,6 +212,7 @@ gst_navigation_send_event_simple (GstNavigation * navigation, GstEvent * event)
   GstNavigationInterface *iface = GST_NAVIGATION_GET_INTERFACE (navigation);
 
   g_return_if_fail (GST_EVENT_TYPE (event) == GST_EVENT_NAVIGATION);
+  g_return_if_fail (iface != NULL);
 
   if (iface->send_event_simple) {
     iface->send_event_simple (navigation, event);
