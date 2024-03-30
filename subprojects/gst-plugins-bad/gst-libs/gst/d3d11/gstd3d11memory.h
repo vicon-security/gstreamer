@@ -257,6 +257,12 @@ ID2D1RenderTarget* gst_d3d11_memory_get_d2d1_render_target (GstD3D11Memory * mem
 GST_D3D11_API
 GHashTable *gst_d3d11_memory_get_d2d1_brushes_cache (GstMemory* mem);
 
+GST_D3D11_API
+void gst_d3d11_d2d1_global_lock (void);
+
+GST_D3D11_API
+void gst_d3d11_d2d1_global_unlock (void);
+
 /**
  * GstD3D11Allocator:
  *

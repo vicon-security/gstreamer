@@ -1480,6 +1480,18 @@ gst_d3d11_allocator_dummy_alloc (GstAllocator * allocator, gsize size,
   g_return_val_if_reached (NULL);
 }
 
+G_LOCK_DEFINE_STATIC (global_d2d1_lock);
+
+void gst_d3d11_d2d1_global_lock (void)
+{
+  G_LOCK (global_d2d1_lock);
+}
+
+void gst_d3d11_d2d1_global_unlock (void)
+{
+  G_UNLOCK (global_d2d1_lock);
+}
+
 static void
 gst_d3d11_allocator_free (GstAllocator * allocator, GstMemory * mem)
 {
@@ -1490,8 +1502,11 @@ gst_d3d11_allocator_free (GstAllocator * allocator, GstMemory * mem)
   GST_LOG_OBJECT (allocator, "Free memory %p", mem);
 
   {
+    bool lock_d2d1 = (dmem_priv->d2d1_render_target != NULL);
     GstD3D11DeviceLockGuard lk (dmem->device);
     gst_d3d11_device_fence_simple (dmem->device);
+    if (lock_d2d1)
+      gst_d3d11_d2d1_global_lock ();
     for (i = 0; i < GST_VIDEO_MAX_PLANES; i++) {
       GST_D3D11_CLEAR_COM (dmem_priv->render_target_view[i]);
       GST_D3D11_CLEAR_COM (dmem_priv->shader_resource_view[i]);
@@ -1510,6 +1525,8 @@ gst_d3d11_allocator_free (GstAllocator * allocator, GstMemory * mem)
     GST_D3D11_CLEAR_COM (dmem_priv->buffer);
 
     GST_D3D11_CLEAR_COM (dmem_priv->decoder_handle);
+    if (lock_d2d1)
+      gst_d3d11_d2d1_global_unlock ();    
   }
   gst_clear_object (&dmem->device);
 
