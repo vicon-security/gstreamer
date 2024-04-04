@@ -492,10 +492,19 @@ static void
 gst_d3d11_compositor_pad_dispose (GObject * object)
 {
   GstD3D11CompositorPad *self = GST_D3D11_COMPOSITOR_PAD (object);
+  GstD3D11Device* device = nullptr;
 
-  gst_clear_object (&self->convert);
-  GST_D3D11_CLEAR_COM (self->blend);
+  if (self->convert && self->convert->device) {
+    device = (GstD3D11Device *)gst_object_ref (self->convert->device);
+    gst_clear_object (&self->convert);
+  }
 
+  if (self->blend) {
+    GstD3D11DeviceLockGuard lk (device);
+    GST_D3D11_CLEAR_COM (self->blend);
+  }
+
+  gst_clear_object (&device);
   G_OBJECT_CLASS (parent_pad_class)->dispose (object);
 }
 
@@ -929,6 +938,7 @@ gst_d3d11_compositor_pad_setup_converter (GstVideoAggregatorPad * pad,
         gst_d3d11_device_get_device_handle (self->device);
     gfloat blend_factor = 1.0f;
 
+    GstD3D11DeviceLockGuard lk (self->device);
     GST_D3D11_CLEAR_COM (cpad->blend);
 
     desc.AlphaToCoverageEnable = FALSE;
@@ -1259,8 +1269,13 @@ static gboolean
 gst_d3d11_compositor_pad_clear_resource (GstD3D11Compositor * self,
     GstD3D11CompositorPad * cpad, gpointer user_data)
 {
+  GstD3D11Device* device = (GstD3D11Device *)user_data;
+
   gst_clear_object (&cpad->convert);
-  GST_D3D11_CLEAR_COM (cpad->blend);
+  if (cpad->blend) {
+    GstD3D11DeviceLockGuard lk (device);
+    GST_D3D11_CLEAR_COM (cpad->blend);
+  }
 
   return TRUE;
 }
@@ -1693,7 +1708,7 @@ gst_d3d11_compositor_negotiated_src_caps (GstAggregator * agg, GstCaps * caps)
 
   gst_element_foreach_sink_pad (GST_ELEMENT_CAST (self),
       (GstElementForeachPadFunc) gst_d3d11_compositor_pad_clear_resource,
-      nullptr);
+      self->device);
 
   gst_clear_buffer (&self->fallback_buf);
   g_clear_pointer (&self->checker_background, gst_d3d11_compositor_quad_free);
@@ -2365,10 +2380,13 @@ gst_d3d11_compositor_create_output_buffer (GstVideoAggregator * vagg,
   /* Clear all device dependent resources */
   gst_element_foreach_sink_pad (GST_ELEMENT_CAST (vagg),
       (GstElementForeachPadFunc) gst_d3d11_compositor_pad_clear_resource,
-      nullptr);
+      self->device);
 
-  gst_clear_buffer (&self->fallback_buf);
-  g_clear_pointer (&self->checker_background, gst_d3d11_compositor_quad_free);
+  {
+    GstD3D11DeviceLockGuard lk (self->device);
+    gst_clear_buffer (&self->fallback_buf);
+    g_clear_pointer (&self->checker_background, gst_d3d11_compositor_quad_free);
+  }
 
   GST_INFO_OBJECT (self, "Updating device %" GST_PTR_FORMAT " -> %"
       GST_PTR_FORMAT, self->device, data.other_device);
