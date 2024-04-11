@@ -5442,12 +5442,12 @@ gst_rtsp_conninfo_connect (GstRTSPSrc * src, GstRTSPConnInfo * info,
   do {
     if (info->connection == NULL) {
       if (info->url == NULL) {
-        GST_DEBUG_OBJECT (src, "parsing uri (%s)...", info->url_str);
+        GST_DEBUG_OBJECT (src, "parsing uri (%s)...", info->location);
         if ((res = gst_rtsp_url_parse (info->location, &info->url)) < 0)
           goto parse_error;
       }
       /* create connection */
-      GST_DEBUG_OBJECT (src, "creating connection (%s)...", info->url_str);
+      GST_DEBUG_OBJECT (src, "creating connection (%s)...", info->location);
       if ((res = gst_rtsp_connection_create (info->url, &info->connection)) < 0)
         goto could_not_create;
 
@@ -5494,8 +5494,8 @@ gst_rtsp_conninfo_connect (GstRTSPSrc * src, GstRTSPConnInfo * info,
       /* connect */
       if (async)
         GST_ELEMENT_PROGRESS (src, CONTINUE, "connect",
-            ("Connecting to %s", info->url_str));
-      GST_DEBUG_OBJECT (src, "connecting (%s)...", info->url_str);
+            ("Connecting to %s", info->location));
+      GST_DEBUG_OBJECT (src, "connecting (%s)...", info->location);
       res = gst_rtsp_connection_connect_with_response_usec (info->connection,
           src->tcp_timeout, &response);
 
@@ -10042,7 +10042,7 @@ gst_rtspsrc_uri_set_uri (GstURIHandler * handler, const gchar * uri,
   src->sdp = sdp;
   src->from_sdp = sdp != NULL;
 
-  GST_DEBUG_OBJECT (src, "set uri: %s", GST_STR_NULL (src->conninfo.url_str));
+  GST_DEBUG_OBJECT (src, "set uri: %s", GST_STR_NULL (uri));
   GST_DEBUG_OBJECT (src, "request uri is: %s",
       GST_STR_NULL (src->conninfo.url_str));
 
@@ -10051,8 +10051,7 @@ gst_rtspsrc_uri_set_uri (GstURIHandler * handler, const gchar * uri,
   /* Special cases */
 was_ok:
   {
-    GST_DEBUG_OBJECT (src, "URI was ok: '%s'",
-        GST_STR_NULL (src->conninfo.url_str));
+    GST_DEBUG_OBJECT (src, "URI was ok: '%s'", GST_STR_NULL (uri));
     return TRUE;
   }
 sdp_failed:
@@ -10065,7 +10064,7 @@ sdp_failed:
 invalid_sdp:
   {
     GST_ERROR_OBJECT (src, "Not a valid SDP (%d) '%s'", sres,
-        GST_STR_NULL (src->conninfo.url_str));
+        GST_STR_NULL (uri));
     gst_sdp_message_free (sdp);
     g_set_error_literal (error, GST_URI_ERROR, GST_URI_ERROR_BAD_URI,
         "Invalid SDP");
@@ -10074,7 +10073,7 @@ invalid_sdp:
 parse_error:
   {
     GST_ERROR_OBJECT (src, "Not a valid RTSP url '%s' (%d)",
-        GST_STR_NULL (src->conninfo.url_str), res);
+        GST_STR_NULL (uri), res);
     g_set_error_literal (error, GST_URI_ERROR, GST_URI_ERROR_BAD_URI,
         "Invalid RTSP URI");
     return FALSE;
