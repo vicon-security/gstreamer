@@ -198,9 +198,7 @@ void DewarpPlugin::setPosition()
 		break;
 	case IMV_Defs::E_VTYPE_PERI:
 	case IMV_Defs::E_VTYPE_PERI_CUSTOM:
-		if (m_mountPos == IMV_Defs::E_CPOS_GROUND || m_mountPos == IMV_Defs::E_CPOS_CEILING) {
 			m_camera->SetPosition(&(m_data[0].m_pan), &(m_data[0].m_tilt), &(m_data[0].m_zoom));
-		}
 		break;
 	case IMV_Defs::E_VTYPE_PTZ:
 	case IMV_Defs::E_VTYPE_VERTICAL_SELFIE:
@@ -273,7 +271,7 @@ bool DewarpPlugin::calibrateLens(std::string format, int width, int height, GstC
 
   m_camera->SetLens((char*)m_lensName.c_str());
   m_camera->SetZoomLimits(23.f, 180.f);
-  m_camera->SetNavigationType(IMV_Defs::E_NAV_360xFOV_LOCKED);
+  m_camera->SetNavigationType(IMV_Defs::E_NAV_360x360_STABILIZED);
 
   if (colorFormat == IMV_Defs::E_RGBA_32_STD)
   {
