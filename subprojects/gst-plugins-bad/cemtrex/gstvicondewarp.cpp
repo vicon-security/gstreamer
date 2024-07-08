@@ -265,6 +265,7 @@ std::string DewarpPlugin::getLensName()
 
 bool DewarpPlugin::calibrateLens(std::string format, int width, int height, GstCaps* caps, GstBuffer* originalInputBuffer)
 {
+	GST_INFO("Starting calibration.");
 	auto colorFormat = string2ColorFormat(format);
 	m_acsInfo = "";
 	m_camera->SetACS(nullptr);
@@ -276,7 +277,10 @@ bool DewarpPlugin::calibrateLens(std::string format, int width, int height, GstC
   if (colorFormat == IMV_Defs::E_RGBA_32_STD)
   {
     if (!m_buffers.setInputBuffer(originalInputBuffer, width, height))
-      return false;
+	{
+		GST_ERROR("Error setting the input RBGA buffer.");
+		return false;
+	}
   }
   else
 	{
@@ -305,7 +309,11 @@ bool DewarpPlugin::calibrateLens(std::string format, int width, int height, GstC
     if (toCaps)
       gst_caps_unref(toCaps);
     if (!ok)
-      return false;
+	{
+		GST_ERROR("Error setting the converted input buffer.");
+		return false;
+	}
+      
 
     colorFormat = IMV_Defs::E_RGBA_32_STD;
 	}
@@ -319,9 +327,10 @@ bool DewarpPlugin::calibrateLens(std::string format, int width, int height, GstC
 		m_acsInfo = info;
 		m_camera->SetACS(info);
 		m_camera->SetFiltering(IMV_Defs::E_FILTER_BILINEAR_ONSTOP);
+		GST_ERROR("Error in calibration. [result: %lu]", result);
 		return true;
 	}
-
+	GST_ERROR("Error in calibration.");
 	return false;
 }
 
@@ -360,6 +369,7 @@ GstFlowReturn DewarpPlugin::chain(GstPad* pad, GstCaps* inputCaps, GstBuffer* in
 	std::string bufferFormat;
 	if (!getCapsInfo(inputCaps, bufferFormat, width, height))
 	{
+		GST_ERROR("Error getting the caps info.");
 		return GST_FLOW_CUSTOM_ERROR_2;
 	}
 
@@ -373,6 +383,7 @@ GstFlowReturn DewarpPlugin::chain(GstPad* pad, GstCaps* inputCaps, GstBuffer* in
 		if (!calibrateLens(bufferFormat, width, height, inputCaps, inputBuffer))
 		{
 			m_buffers.reset();
+			GST_ERROR("Error calibrating the lens.");
 			return GST_FLOW_CUSTOM_ERROR_2;
 		}
 		m_isLensCalibrated = true;
@@ -381,6 +392,7 @@ GstFlowReturn DewarpPlugin::chain(GstPad* pad, GstCaps* inputCaps, GstBuffer* in
 	{
 		if (!m_buffers.setInputBuffer(inputBuffer, width, height))
 		{
+			GST_ERROR("Error setting the input buffer.");
 			return GST_FLOW_CUSTOM_ERROR_2;
 		}
 	}
@@ -390,6 +402,7 @@ GstFlowReturn DewarpPlugin::chain(GstPad* pad, GstCaps* inputCaps, GstBuffer* in
 		if (!setUpCamera(bufferFormat, width, height, inputBuffer))
 		{
 			m_buffers.reset();
+			GST_ERROR("Error setting up the camera.");
 			return GST_FLOW_CUSTOM_ERROR_2;
 		}
 		m_isCameraSetup = true;
@@ -400,7 +413,7 @@ GstFlowReturn DewarpPlugin::chain(GstPad* pad, GstCaps* inputCaps, GstBuffer* in
 
 	if (ret != IMV_Defs::E_ERR_OK)
 	{
-		GST_ERROR("Error to updating output buffer");
+		GST_ERROR("Error updating output buffer");
 		m_buffers.reset();
 		return GST_FLOW_CUSTOM_ERROR_2;
 	}
