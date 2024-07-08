@@ -327,10 +327,11 @@ bool DewarpPlugin::calibrateLens(std::string format, int width, int height, GstC
 		m_acsInfo = info;
 		m_camera->SetACS(info);
 		m_camera->SetFiltering(IMV_Defs::E_FILTER_BILINEAR_ONSTOP);
-		GST_ERROR("Error in calibration. [result: %lu]", result);
+		GST_INFO("Calibration successful.");
 		return true;
 	}
-	GST_ERROR("Error in calibration.");
+	
+	GST_ERROR("Error in calibration. [result: %lu]", result);
 	return false;
 }
 
