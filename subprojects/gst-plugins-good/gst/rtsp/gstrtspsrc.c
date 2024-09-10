@@ -7653,7 +7653,7 @@ gst_rtspsrc_stream_skip_if_equal (GstRTSPSrc * src, GstRTSPStream * stream,
     return GST_RTSPSRC_FOREACH_STREAM_CONTINUE;
 
   /* skip all streams with the same control url */
-  if (g_str_equal (ostream->conninfo.location, stream->conninfo.location)) {
+  if (ostream->conninfo.location && stream->conninfo.location && g_str_equal (ostream->conninfo.location, stream->conninfo.location)) {
     GST_DEBUG_OBJECT (src, "found stream %p with same control %s",
         stream, stream->conninfo.location);
     stream->skipped = TRUE;
