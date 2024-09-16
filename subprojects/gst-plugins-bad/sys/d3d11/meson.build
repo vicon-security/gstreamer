@@ -19,6 +19,7 @@ d3d11_sources = [
   'gstd3d11vp9dec.cpp',
   'gstd3d11window.cpp',
   'gstd3d11window_dummy.cpp',
+  'gstd3d11d2d1.cpp',
   'plugin.cpp',
 ]
 
@@ -36,13 +37,6 @@ if not gstd3d11_dep.found() or not cc.has_header('dxva.h') or not cc.has_header(
     error('The d3d11 was enabled explicitly, but required dependencies were not found.')
   endif
   subdir_done()
-endif
-
-d2d1_lib = cc.find_library('d2d1', required: false)
-if cc.has_header('d2d1.h') and d2d1_lib.found()
-  extra_dep += [d2d1_lib]
-  d3d11_sources += ['gstd3d11d2d1.cpp']
-  extra_args += ['-DHAVE_D2D1']
 endif
 
 d3dcompiler_lib = cc.find_library('d3dcompiler', required: d3d11_option)
