@@ -137,6 +137,13 @@ gboolean nal_reader_get_se (NalReader * nr, gint32 * val);
   } \
 }
 
+#define VICON_READ_UINT8(nr, val, nbits) { \
+  if (!nal_reader_get_bits_uint8 (nr, &val, nbits)) { \
+    GST_DEBUG ("failed to read uint8 for '" G_STRINGIFY (val) "', nbits: %d", nbits); \
+    goto error; \
+  } \
+}
+
 #define READ_UINT16(nr, val, nbits) { \
   if (!nal_reader_get_bits_uint16 (nr, &val, nbits)) { \
   GST_WARNING ("failed to read uint16 for '" G_STRINGIFY (val) "', nbits: %d", nbits); \
