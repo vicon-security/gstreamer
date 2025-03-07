@@ -1109,7 +1109,7 @@ gst_h264_parser_parse_user_data_unregistered (GstH264NalParser * nalparser,
 
   data = g_malloc0 (payload_size);
   for (i = 0; i < payload_size; ++i) {
-    READ_UINT8 (nr, data[i], 8);
+    VICON_READ_UINT8 (nr, data[i], 8);
   }
 
   if (payload_size < 1) {
@@ -1124,7 +1124,7 @@ gst_h264_parser_parse_user_data_unregistered (GstH264NalParser * nalparser,
 
 error:
   {
-    GST_WARNING ("error parsing \"User Data Unregistered\"");
+    GST_DEBUG ("error parsing \"User Data Unregistered\"");
     g_clear_pointer (&data, g_free);
     return GST_H264_PARSER_ERROR;
   }
