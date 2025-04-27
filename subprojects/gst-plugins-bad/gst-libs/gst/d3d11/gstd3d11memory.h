@@ -250,11 +250,12 @@ ID3D11VideoProcessorOutputView *  gst_d3d11_memory_get_processor_output_view (Gs
                                                                               ID3D11VideoDevice * video_device,
                                                                               ID3D11VideoProcessorEnumerator * enumerator);
 
-
 GST_D3D11_API
 ID2D1RenderTarget* gst_d3d11_memory_get_d2d1_render_target (GstD3D11Memory * mem,
                                                             ID2D1Factory * factory);
 
+GST_D3D11_API
+GHashTable *gst_d3d11_memory_get_d2d1_brushes_cache (GstMemory* mem);
 
 /**
  * GstD3D11Allocator:

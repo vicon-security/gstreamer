@@ -43,10 +43,11 @@ d3d11_conf = configuration_data()
 
 d3d11_lib = cc.find_library('d3d11', required : false)
 dxgi_lib = cc.find_library('dxgi', required : false)
+d2d1_lib = cc.find_library('d2d1', required : false)
 d3dcompiler_lib = cc.find_library('d3dcompiler', required: false)
 runtimeobject_lib = cc.find_library('runtimeobject', required : false)
 
-if not d3d11_lib.found() or not dxgi_lib.found()
+if not d3d11_lib.found() or not dxgi_lib.found() or not d2d1_lib.found()
   subdir_done()
 endif
 
@@ -183,11 +184,11 @@ gstd3d11 = library('gstd3d11-' + api_version,
   version : libversion,
   soversion : soversion,
   install : true,
-  dependencies : [gstbase_dep, gstvideo_dep, gmodule_dep, d3d11_lib, dxgi_lib] + extra_deps
+  dependencies : [gstbase_dep, gstvideo_dep, gmodule_dep, d3d11_lib, dxgi_lib, d2d1_lib] + extra_deps
 )
 
 pkgconfig.generate(gstd3d11,
-  libraries : [gstbase_dep, gstvideo_dep, d3d11_lib, dxgi_lib],
+  libraries : [gstbase_dep, gstvideo_dep, d3d11_lib, dxgi_lib, d2d1_lib],
   variables : pkgconfig_variables,
   subdirs : pkgconfig_subdirs,
   extra_cflags : ['-I${libdir}/gstreamer-1.0/include'],
@@ -208,7 +209,7 @@ if build_gir
     'includes' : gir_includes,
     'install' : true,
     'extra_args' : gir_init_section + ['-DGST_USE_UNSTABLE_API'],
-    'dependencies' : [gstbase_dep, gstvideo_dep, d3d11_lib, dxgi_lib],
+    'dependencies' : [gstbase_dep, gstvideo_dep, d3d11_lib, dxgi_lib, d2d1_lib],
   }
   if not static_build
     d3d11_gir = gnome.generate_gir(gstd3d11, kwargs: gir)
@@ -223,7 +224,7 @@ install_headers(d3d11_headers, subdir : 'gstreamer-1.0/gst/d3d11')
 
 gstd3d11_dep = declare_dependency(link_with : gstd3d11,
   include_directories : [libsinc],
-  dependencies : [gstbase_dep, gstvideo_dep, d3d11_lib, dxgi_lib],
+  dependencies : [gstbase_dep, gstvideo_dep, d3d11_lib, dxgi_lib, d2d1_lib],
   sources : gen_sources)
 
 meson.override_dependency(pkg_name, gstd3d11_dep)

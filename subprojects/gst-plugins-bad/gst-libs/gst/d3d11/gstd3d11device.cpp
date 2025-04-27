@@ -137,6 +137,8 @@ struct _GstD3D11DevicePrivate
   IDXGIDebug *dxgi_debug;
   IDXGIInfoQueue *dxgi_info_queue;
 #endif
+
+  ID2D1Factory *d2d1_factory;
 };
 
 static void
@@ -761,6 +763,7 @@ gst_d3d11_device_dispose (GObject * object)
   GST_D3D11_CLEAR_COM (priv->dxgi_info_queue);
 #endif
 
+  GST_D3D11_CLEAR_COM (priv->d2d1_factory);
   G_OBJECT_CLASS (parent_class)->dispose (object);
 }
 
@@ -1695,4 +1698,38 @@ gst_d3d11_fence_wait (GstD3D11Fence * fence)
   priv->synced = TRUE;
 
   return TRUE;
+}
+
+/**
+ * gst_d3d11_device_get_d2d1_factory:
+ * @device: a #GstD3D11Device
+ *
+ * Gets the %ID2D1Factory previously attached to the #GstD3D11Device,
+ * or creates and attaches one on the first call to this function.
+ * Not thread-safe, needs device lock.
+ *
+ * Returns: %ID2D1Factory or %NULL on error
+ *
+ * Since: 1.22 (custom patch added by Cemtrex & Fluendo)
+ */
+ID2D1Factory*
+gst_d3d11_device_get_d2d1_factory (GstD3D11Device * device)
+{
+  GstD3D11DevicePrivate *priv;
+
+  g_return_val_if_fail (GST_IS_D3D11_DEVICE (device), nullptr);
+
+  priv = device->priv;
+  if (priv->d2d1_factory == nullptr) {
+    HRESULT hr;
+
+    hr = D2D1CreateFactory (D2D1_FACTORY_TYPE_MULTI_THREADED,
+        &priv->d2d1_factory);
+    if (!gst_d3d11_result(hr, device)) {
+      GST_ERROR_OBJECT (device,
+	  "Could not create ID2D1Factory, hr: 0x%x", (guint)hr);
+    }
+  }
+
+  return priv->d2d1_factory;
 }

@@ -119,6 +119,9 @@ gboolean              gst_d3d11_device_get_format         (GstD3D11Device * devi
                                                            GstVideoFormat format,
                                                            GstD3D11Format * device_format);
 
+GST_D3D11_API
+ID2D1Factory*         gst_d3d11_device_get_d2d1_factory   (GstD3D11Device * device);
+
 /* Used internally by gstd3d11utils.cpp */
 void                  gst_d3d11_device_mark_suspended     (GstD3D11Device* device);
 
